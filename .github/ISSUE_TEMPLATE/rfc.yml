@@ -1,0 +1,49 @@
+name: 📐 RFC Proposal
+description: Propose an architectural change via RFC
+title: "[RFC]: "
+labels: ["rfc"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        RFCs are for significant architectural decisions. For simple features, use the Feature Request template instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One-paragraph summary of the proposal.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this change necessary? What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: design
+    attributes:
+      label: Detailed Design
+      description: |
+        Technical details of how this would work.
+        Include API examples, data structures, and flow diagrams.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Trade-offs & Alternatives
+      description: What are the downsides? What alternatives were considered?
+    validations:
+      required: true
+
+  - type: textarea
+    id: migration
+    attributes:
+      label: Migration Strategy
+      description: How do existing users upgrade? Is this a breaking change?

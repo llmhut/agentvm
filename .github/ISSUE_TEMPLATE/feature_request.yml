@@ -1,0 +1,58 @@
+name: 💡 Feature Request
+description: Propose a new feature for AgentKernel
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your feature idea! For major architectural changes, consider writing an RFC instead.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this solve? What's the pain point?
+      placeholder: I'm frustrated when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: How do you think this should work? Include code examples if possible.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: What other approaches did you consider?
+
+  - type: dropdown
+    id: module
+    attributes:
+      label: Which module does this affect?
+      options:
+        - Core (Kernel/Agent/Process)
+        - Memory Bus
+        - Tool Router
+        - Message Broker
+        - Scheduler
+        - CLI
+        - SDK
+        - Documentation
+        - Other
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Which roadmap phase does this fit in?
+      options:
+        - "Phase 1 — Foundation"
+        - "Phase 2 — Core Engine"
+        - "Phase 3 — Ecosystem"
+        - "Phase 4 — Production"
+        - "Not sure"

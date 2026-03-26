@@ -1,0 +1,68 @@
+{
+  "name": "agentkernel",
+  "version": "0.1.0-alpha.1",
+  "type": "module",
+  "description": "The runtime your AI agents deserve. Process management, memory bus, tool routing, message passing, and scheduling for autonomous agents.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/ --ext .ts",
+    "lint:fix": "eslint src/ --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "llm",
+    "runtime",
+    "kernel",
+    "multi-agent",
+    "orchestration",
+    "agentic",
+    "langchain",
+    "crewai",
+    "autogen",
+    "process-manager",
+    "message-broker",
+    "tool-routing"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/llmhut/agentkernel"
+  },
+  "bugs": {
+    "url": "https://github.com/llmhut/agentkernel/issues"
+  },
+  "homepage": "https://github.com/llmhut/agentkernel#readme",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/node": "^20.0.0",
+    "@vitest/coverage-v8": "^4.1.1",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.57.2",
+    "vitest": "^4.1.1"
+  },
+  "dependencies": {
+    "nanoid": "^5.0.0"
+  }
+}
