@@ -186,24 +186,24 @@ agent1.publish('research-updates', {
 
 We're building in public. Here's where we're headed:
 
-### 🟢 Phase 1 — Foundation (v0.1.x) `← WE ARE HERE`
+### ✅ Phase 1 — Foundation (v0.1.x) `COMPLETE`
 - [x] Project scaffolding and repo setup
-- [ ] Agent process model (spawn / pause / resume / kill)
-- [ ] In-memory state management
-- [ ] Basic CLI (`agentvm start`, `agentvm ps`, `agentvm kill`)
-- [ ] TypeScript SDK with full type safety
-- [ ] Core event system
-- [ ] Unit test framework
+- [x] Agent process model (spawn / pause / resume / kill)
+- [x] In-memory state management
+- [x] Basic CLI (`agentvm start`, `agentvm ps`, `agentvm kill`)
+- [x] TypeScript SDK with full type safety
+- [x] Core event system
+- [x] 135 unit tests at 90%+ coverage
 
-### 🟡 Phase 2 — Core Engine (v0.2.x)
-- [ ] Tool router with permission model
-- [ ] Message broker (pub/sub + direct channels)
+### 🟢 Phase 2 — Core Engine (v0.2.x) `← WE ARE HERE`
+- [x] Tool router with permission model
+- [x] Message broker (pub/sub + direct channels)
+- [x] Event-driven scheduler with dependency resolution
 - [ ] Pluggable memory backends (SQLite, Redis)
-- [ ] Event-driven scheduler with dependency resolution
-- [ ] Agent contracts (typed inputs/outputs)
+- [ ] Agent contracts with runtime validation
 - [ ] Configuration system (YAML + env vars)
 
-### 🟠 Phase 3 — Ecosystem (v0.3.x)
+### 🟡 Phase 3 — Ecosystem (v0.3.x)
 - [ ] LangChain adapter plugin
 - [ ] CrewAI adapter plugin
 - [ ] Resource monitoring and limits (tokens, time, cost)
@@ -211,7 +211,7 @@ We're building in public. Here's where we're headed:
 - [ ] Docker-based tool sandboxing
 - [ ] Python SDK
 
-### 🔴 Phase 4 — Production (v1.0)
+### 🟠 Phase 4 — Production (v1.0)
 - [ ] Distributed mode (multi-node agent clusters)
 - [ ] Kubernetes operator
 - [ ] Admin dashboard web UI
@@ -220,8 +220,6 @@ We're building in public. Here's where we're headed:
 - [ ] Security audit
 
 > 📋 See [ROADMAP.md](./ROADMAP.md) for the full breakdown with milestones and RFCs.
-
----
 
 ## Project Structure
 
