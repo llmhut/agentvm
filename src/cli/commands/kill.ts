@@ -1,9 +1,6 @@
 import { info, log, c } from '../utils.js';
 
-export async function killCommand(
-  processId: string,
-  options: { all: boolean }
-): Promise<void> {
+export async function killCommand(_processId: string, _options: { all: boolean }): Promise<void> {
   log('');
   info(`The ${c.cyan('kill')} command works inside the AgentVM console.`);
   log('');

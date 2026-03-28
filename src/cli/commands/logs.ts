@@ -1,8 +1,8 @@
 import { info, log, c } from '../utils.js';
 
 export async function logsCommand(
-  processId: string,
-  options: { follow: boolean; lines: string }
+  _processId: string,
+  _options: { follow: boolean; lines: string },
 ): Promise<void> {
   log('');
   info(`The ${c.cyan('logs')} command works inside the AgentVM console.`);
