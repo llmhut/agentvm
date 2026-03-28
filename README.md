@@ -77,13 +77,13 @@ Every AI agent framework reinvents the same infrastructure: process lifecycle, m
 ### Installation
 
 ```bash
-npm install agentvm
+npm install @llmhut/agentvm
 ```
 
 ### Hello World — Your First Agent
 
 ```typescript
-import { Kernel, Agent, Tool } from 'agentvm';
+import { Kernel, Agent, Tool } from '@llmhut/agentvm';
 
 // Initialize the kernel
 const kernel = new Kernel();
@@ -114,7 +114,7 @@ await kernel.terminate(process.id);
 ### Multi-Agent Workflow
 
 ```typescript
-import { Kernel, Agent, Pipeline } from 'agentvm';
+import { Kernel, Agent, Pipeline } from '@llmhut/agentvm';
 
 const kernel = new Kernel();
 
@@ -151,7 +151,7 @@ console.log(result);
 ### Inter-Agent Messaging
 
 ```typescript
-import { Kernel, Agent, Channel } from 'agentvm';
+import { Kernel, Agent, Channel } from '@llmhut/agentvm';
 
 const kernel = new Kernel();
 
@@ -318,6 +318,6 @@ MIT — use it however you want. See [LICENSE](LICENSE) for details.
 
 If this project resonates with you, give it a ⭐ and join us in building the foundation of agentic AI.
 
-[⭐ Star on GitHub](https://github.com/llmhut/agentvm) · [💬 Join Discord](https://discord.gg/m5R88NkM) · [🐦 Follow on X]()
+[⭐ Star on GitHub]() · [💬 Join Discord]() · [🐦 Follow on X]()
 
 </div>

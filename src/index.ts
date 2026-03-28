@@ -5,7 +5,7 @@
  *
  * @example
  * ```ts
- * import { Kernel, Agent } from 'agentvm';
+ * import { Kernel, Agent } from '@llmhut/agentvm';
  *
  * const kernel = new Kernel();
  * const agent = new Agent({ name: 'my-agent' });
@@ -24,12 +24,7 @@ export { Process } from './core/process';
 export { MemoryBus } from './memory/bus';
 
 // Tools
-export {
-  ToolRouter,
-  ToolNotFoundError,
-  ToolExecutionError,
-  ToolRateLimitError,
-} from './tools/router';
+export { ToolRouter, ToolNotFoundError, ToolExecutionError, ToolRateLimitError } from './tools/router';
 
 // Broker
 export { MessageBroker } from './broker/broker';

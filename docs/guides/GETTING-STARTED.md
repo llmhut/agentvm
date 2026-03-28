@@ -5,7 +5,7 @@ This guide will have you running agents in under 5 minutes.
 ## Installation
 
 ```bash
-npm install agentvm
+npm install @llmhut/agentvm
 ```
 
 **Requirements:** Node.js 20+
@@ -23,7 +23,7 @@ Think of it like this: an `Agent` is a class, a `Process` is an instance, and th
 ## Step 1: Create a Kernel
 
 ```typescript
-import { Kernel } from 'agentvm';
+import { Kernel } from '@llmhut/agentvm';
 
 const kernel = new Kernel({
   name: 'my-app',
@@ -34,7 +34,7 @@ const kernel = new Kernel({
 ## Step 2: Define an Agent
 
 ```typescript
-import { Agent } from 'agentvm';
+import { Agent } from '@llmhut/agentvm';
 
 const researcher = new Agent({
   name: 'researcher',
@@ -90,7 +90,7 @@ kernel.onAny((event) => {
 ## Step 6: Use Memory
 
 ```typescript
-import { MemoryBus } from 'agentvm';
+import { MemoryBus } from '@llmhut/agentvm';
 
 const memoryBus = new MemoryBus();
 
@@ -107,7 +107,7 @@ await shared.set('config', { model: 'claude-sonnet' });
 ## Step 7: Register Tools
 
 ```typescript
-import { ToolRouter } from 'agentvm';
+import { ToolRouter } from '@llmhut/agentvm';
 
 const toolRouter = new ToolRouter();
 
@@ -128,7 +128,7 @@ toolRouter.register({
 ## Step 8: Agent Communication
 
 ```typescript
-import { MessageBroker } from 'agentvm';
+import { MessageBroker } from '@llmhut/agentvm';
 
 const broker = new MessageBroker();
 

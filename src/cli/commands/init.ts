@@ -42,7 +42,7 @@ export async function initCommand(
       build: 'tsc',
     },
     dependencies: {
-      agentvm: '^0.1.0',
+      '@llmhut/agentvm': '^0.1.0',
     },
     devDependencies: {
       typescript: '^5.5.0',
@@ -66,7 +66,7 @@ export async function initCommand(
   }, null, 2));
 
   // agentvm.config.ts
-  writeFile(projectDir, 'agentvm.config.ts', `import { Kernel, Agent } from 'agentvm';
+  writeFile(projectDir, 'agentvm.config.ts', `import { Kernel, Agent } from '@llmhut/agentvm';
 
 /**
  * AgentVM Configuration
@@ -103,7 +103,7 @@ export default kernel;
 `);
 
   // Example agent file
-  writeFile(projectDir, 'src/agents/researcher.ts', `import { Agent } from 'agentvm';
+  writeFile(projectDir, 'src/agents/researcher.ts', `import { Agent } from '@llmhut/agentvm';
 
 /**
  * Researcher Agent
@@ -135,7 +135,7 @@ export const researcher = new Agent({
 `);
 
   // Example tool file
-  writeFile(projectDir, 'src/tools/search.ts', `import type { ToolDefinition } from 'agentvm';
+  writeFile(projectDir, 'src/tools/search.ts', `import type { ToolDefinition } from '@llmhut/agentvm';
 
 /**
  * Search Tool
