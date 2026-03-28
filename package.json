@@ -5,19 +5,22 @@
   "description": "The runtime your AI agents deserve. Process management, memory bus, tool routing, message passing, and scheduling for autonomous agents.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "agentvm": "dist/cli/index.js"
+  },
   "files": [
     "dist",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "tsup src/index.ts src/cli/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts src/cli/index.ts --format esm --dts --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src/ --ext .ts",
-    "lint:fix": "eslint src/ --ext .ts --fix",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"
@@ -52,17 +55,18 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^9.0.0",
     "@types/node": "^20.0.0",
-    "@vitest/coverage-v8": "^4.1.1",
+    "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.5.0",
-    "typescript-eslint": "^8.57.2",
-    "vitest": "^4.1.1"
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^2.0.0"
   },
   "dependencies": {
+    "commander": "^12.1.0",
     "nanoid": "^5.0.0"
   }
 }
