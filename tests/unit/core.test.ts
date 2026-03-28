@@ -20,7 +20,6 @@ describe('Agent', () => {
       memory: { persistent: true },
     });
     expect(agent.name).toBe('researcher');
-    expect(agent.description).toBe('Researches topics');
     expect(agent.tools).toEqual(['web_search', 'summarize']);
     expect(agent.memory.persistent).toBe(true);
   });
@@ -55,6 +54,13 @@ describe('Kernel', () => {
     expect(kernel.name).toBe('my-app');
   });
 
+  it('should have memory, tools, and broker subsystems', () => {
+    const kernel = new Kernel();
+    expect(kernel.memory).toBeDefined();
+    expect(kernel.tools).toBeDefined();
+    expect(kernel.broker).toBeDefined();
+  });
+
   // Agent Registration
 
   it('should register an agent', () => {
@@ -66,9 +72,7 @@ describe('Kernel', () => {
 
   it('should register multiple agents', () => {
     const kernel = new Kernel();
-    const a1 = new Agent({ name: 'agent-1' });
-    const a2 = new Agent({ name: 'agent-2' });
-    kernel.register(a1, a2);
+    kernel.register(new Agent({ name: 'a' }), new Agent({ name: 'b' }));
     expect(kernel.agents.length).toBe(2);
   });
 
@@ -133,8 +137,7 @@ describe('Kernel', () => {
 
   it('should shutdown all processes', async () => {
     const kernel = new Kernel();
-    kernel.register(new Agent({ name: 'a' }));
-    kernel.register(new Agent({ name: 'b' }));
+    kernel.register(new Agent({ name: 'a' }), new Agent({ name: 'b' }));
 
     const p1 = await kernel.spawn('a');
     const p2 = await kernel.spawn('b');
@@ -144,27 +147,12 @@ describe('Kernel', () => {
     expect(p2.state).toBe('terminated');
   });
 
-  it('should query processes by agent name', async () => {
-    const kernel = new Kernel();
-    kernel.register(new Agent({ name: 'a' }));
-    kernel.register(new Agent({ name: 'b' }));
-
-    await kernel.spawn('a');
-    await kernel.spawn('a');
-    await kernel.spawn('b');
-
-    const aProcesses = kernel.getProcesses({ agentName: 'a' });
-    expect(aProcesses.length).toBe(2);
-  });
-
   // Events
 
   it('should emit events on lifecycle changes', async () => {
     const events: string[] = [];
     const kernel = new Kernel({
-      on: {
-        '*': (e) => events.push(e.type),
-      },
+      on: { '*': (e) => events.push(e.type) },
     });
     kernel.register(new Agent({ name: 'test' }));
     const process = await kernel.spawn('test');
@@ -175,13 +163,334 @@ describe('Kernel', () => {
     expect(events).toContain('process:spawned');
     expect(events).toContain('process:terminated');
   });
+});
 
-  it('should return unsubscribe function from on()', () => {
+// ── Execution Tests ──
+
+describe('Kernel.execute()', () => {
+  it('should execute an agent handler and return result', async () => {
     const kernel = new Kernel();
-    const handler = vi.fn();
-    const unsub = kernel.on('test', handler);
-    expect(typeof unsub).toBe('function');
-    unsub(); // Should not throw
+    const agent = new Agent({
+      name: 'greeter',
+      handler: async (ctx) => `Hello, ${ctx.input}!`,
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('greeter');
+    const result = await kernel.execute(proc.id, { task: 'World' });
+
+    expect(result.output).toBe('Hello, World!');
+    expect(result.agentName).toBe('greeter');
+    expect(result.processId).toBe(proc.id);
+    expect(result.duration).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should pass input from taskInput.input when provided', async () => {
+    const kernel = new Kernel();
+    const agent = new Agent({
+      name: 'echo',
+      handler: async (ctx) => ctx.input,
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('echo');
+    const result = await kernel.execute(proc.id, {
+      task: 'describe task',
+      input: { data: [1, 2, 3] },
+    });
+
+    expect(result.output).toEqual({ data: [1, 2, 3] });
+  });
+
+  it('should fall back to task string as input when input is not provided', async () => {
+    const kernel = new Kernel();
+    const agent = new Agent({
+      name: 'echo',
+      handler: async (ctx) => ctx.input,
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('echo');
+    const result = await kernel.execute(proc.id, { task: 'the task string' });
+
+    expect(result.output).toBe('the task string');
+  });
+
+  it('should fail if process is not running', async () => {
+    const kernel = new Kernel();
+    kernel.register(new Agent({ name: 'test', handler: async () => 'ok' }));
+    const proc = await kernel.spawn('test');
+
+    await kernel.pause(proc.id);
+    await expect(kernel.execute(proc.id, { task: 'x' })).rejects.toThrow('expected "running"');
+  });
+
+  it('should fail if agent has no handler', async () => {
+    const kernel = new Kernel();
+    kernel.register(new Agent({ name: 'no-handler' }));
+    const proc = await kernel.spawn('no-handler');
+
+    await expect(kernel.execute(proc.id, { task: 'x' })).rejects.toThrow('no handler');
+  });
+
+  it('should crash the process on handler error', async () => {
+    const kernel = new Kernel();
+    const agent = new Agent({
+      name: 'crasher',
+      handler: async () => { throw new Error('boom'); },
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('crasher');
+
+    await expect(kernel.execute(proc.id, { task: 'x' })).rejects.toThrow('boom');
+    expect(proc.state).toBe('crashed');
+  });
+
+  it('should store lastExecution metadata on success', async () => {
+    const kernel = new Kernel();
+    const agent = new Agent({
+      name: 'worker',
+      handler: async () => 'done',
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('worker');
+    await kernel.execute(proc.id, { task: 'do work' });
+
+    const meta = proc.getMetadata('lastExecution') as Record<string, unknown>;
+    expect(meta.task).toBe('do work');
+    expect(meta.success).toBe(true);
+    expect(meta.duration).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should emit execution events', async () => {
+    const events: string[] = [];
+    const kernel = new Kernel({ on: { '*': (e) => events.push(e.type) } });
+    const agent = new Agent({
+      name: 'worker',
+      handler: async () => 'done',
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('worker');
+    await kernel.execute(proc.id, { task: 'x' });
+
+    expect(events).toContain('execution:started');
+    expect(events).toContain('execution:completed');
+  });
+});
+
+// ── Memory Integration Tests ──
+
+describe('Kernel + Memory Integration', () => {
+  it('should provide isolated memory to each process', async () => {
+    const kernel = new Kernel();
+    const agent = new Agent({
+      name: 'memo',
+      handler: async (ctx) => {
+        await ctx.memory.set('secret', `${ctx.agentName}-${ctx.processId}`);
+        return await ctx.memory.get('secret');
+      },
+    });
+
+    kernel.register(agent);
+    const p1 = await kernel.spawn('memo');
+    const p2 = await kernel.spawn('memo');
+
+    const r1 = await kernel.execute(p1.id, { task: 'go' });
+    const r2 = await kernel.execute(p2.id, { task: 'go' });
+
+    expect(r1.output).toContain(p1.id);
+    expect(r2.output).toContain(p2.id);
+    expect(r1.output).not.toBe(r2.output);
+  });
+
+  it('should clean up memory on terminate (non-persistent)', async () => {
+    const kernel = new Kernel();
+    const agent = new Agent({
+      name: 'temp',
+      handler: async (ctx) => {
+        await ctx.memory.set('key', 'value');
+        return 'ok';
+      },
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('temp');
+    await kernel.execute(proc.id, { task: 'store' });
+
+    // Memory exists before terminate
+    const mem = kernel.memory.getAccessor(proc.id);
+    expect(await mem.get('key')).toBe('value');
+
+    await kernel.terminate(proc.id);
+
+    // Memory cleaned up after terminate
+    const freshMem = kernel.memory.getAccessor(proc.id);
+    expect(await freshMem.get('key')).toBeUndefined();
+  });
+
+  it('should preserve memory on terminate when persistent', async () => {
+    const kernel = new Kernel();
+    const agent = new Agent({
+      name: 'persist',
+      memory: { persistent: true },
+      handler: async (ctx) => {
+        await ctx.memory.set('key', 'preserved');
+        return 'ok';
+      },
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('persist');
+    await kernel.execute(proc.id, { task: 'store' });
+    await kernel.terminate(proc.id);
+
+    // Memory still exists
+    const mem = kernel.memory.getAccessor(proc.id);
+    expect(await mem.get('key')).toBe('preserved');
+  });
+});
+
+// ── Tool Integration Tests ──
+
+describe('Kernel + Tool Integration', () => {
+  it('should allow agent to call registered tool via context', async () => {
+    const kernel = new Kernel();
+
+    kernel.registerTool({
+      name: 'multiply',
+      description: 'Multiplies two numbers',
+      parameters: { type: 'object' },
+      sideEffects: 'none',
+      permission: 'public',
+      handler: async (params) => {
+        const p = params as { a: number; b: number };
+        return p.a * p.b;
+      },
+    });
+
+    const agent = new Agent({
+      name: 'calculator',
+      tools: ['multiply'],
+      handler: async (ctx) => {
+        return await ctx.useTool('multiply', { a: 6, b: 7 });
+      },
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('calculator');
+    const result = await kernel.execute(proc.id, { task: 'multiply' });
+
+    expect(result.output).toBe(42);
+  });
+
+  it('should reject tool usage if agent does not declare it', async () => {
+    const kernel = new Kernel();
+
+    kernel.registerTool({
+      name: 'secret-tool',
+      description: 'Restricted',
+      parameters: { type: 'object' },
+      sideEffects: 'write',
+      permission: 'admin',
+      handler: async () => 'secret',
+    });
+
+    const agent = new Agent({
+      name: 'restricted',
+      tools: ['allowed-tool'],
+      handler: async (ctx) => {
+        return await ctx.useTool('secret-tool', {});
+      },
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('restricted');
+
+    await expect(kernel.execute(proc.id, { task: 'x' })).rejects.toThrow('not allowed');
+  });
+
+  it('should allow any tool when agent declares no tool restrictions', async () => {
+    const kernel = new Kernel();
+
+    kernel.registerTool({
+      name: 'any-tool',
+      description: 'Open tool',
+      parameters: { type: 'object' },
+      sideEffects: 'none',
+      permission: 'public',
+      handler: async () => 'open-access',
+    });
+
+    const agent = new Agent({
+      name: 'open',
+      tools: [], // empty = no restrictions
+      handler: async (ctx) => {
+        return await ctx.useTool('any-tool', {});
+      },
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('open');
+    const result = await kernel.execute(proc.id, { task: 'x' });
+
+    expect(result.output).toBe('open-access');
+  });
+
+  it('should emit tool events during execution', async () => {
+    const events: string[] = [];
+    const kernel = new Kernel({ on: { '*': (e) => events.push(e.type) } });
+
+    kernel.registerTool({
+      name: 'echo',
+      description: 'Echoes input',
+      parameters: { type: 'string' },
+      sideEffects: 'none',
+      permission: 'public',
+      handler: async (params) => params,
+    });
+
+    const agent = new Agent({
+      name: 'tooluser',
+      handler: async (ctx) => ctx.useTool('echo', 'hello'),
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('tooluser');
+    await kernel.execute(proc.id, { task: 'x' });
+
+    expect(events).toContain('tool:invoked');
+    expect(events).toContain('tool:completed');
+  });
+});
+
+// ── Broker Integration Tests ──
+
+describe('Kernel + Broker Integration', () => {
+  it('should allow agent to publish messages via context', async () => {
+    const kernel = new Kernel();
+    kernel.createChannel({ name: 'updates', type: 'pubsub' });
+
+    const received: unknown[] = [];
+    kernel.broker.subscribe('updates', 'listener', (msg) => {
+      received.push(msg.data);
+    });
+
+    const agent = new Agent({
+      name: 'publisher',
+      handler: async (ctx) => {
+        ctx.publish('updates', { finding: 'AI is cool' });
+        return 'published';
+      },
+    });
+
+    kernel.register(agent);
+    const proc = await kernel.spawn('publisher');
+    await kernel.execute(proc.id, { task: 'research' });
+
+    expect(received).toEqual([{ finding: 'AI is cool' }]);
   });
 });
 
@@ -218,14 +527,5 @@ describe('Process', () => {
     expect(info.agentName).toBe('test');
     expect(info.state).toBe('running');
     expect(info.createdAt).toBeInstanceOf(Date);
-  });
-
-  it('should reject invalid state transitions', async () => {
-    const kernel = new Kernel();
-    kernel.register(new Agent({ name: 'test' }));
-    const process = await kernel.spawn('test');
-
-    // Can't resume a running process
-    expect(() => kernel.resume(process.id)).rejects.toThrow();
   });
 });

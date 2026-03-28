@@ -1,30 +1,43 @@
 import type { Agent } from './agent';
 import { Process } from './process';
+import { MemoryBus } from '../memory/bus';
+import { ToolRouter } from '../tools/router';
+import { MessageBroker } from '../broker/broker';
 import type {
   KernelConfig,
   ProcessOptions,
   KernelEvent,
   EventHandler,
   ProcessState,
+  ExecutionContext,
+  ExecutionResult,
+  TaskInput,
+  ToolDefinition,
+  ChannelConfig,
 } from './types';
 
 /**
  * Kernel — The AgentVM runtime.
  *
  * The Kernel is the central orchestrator. It manages agent registration,
- * process lifecycle, and event dispatch.
+ * process lifecycle, memory, tools, messaging, and task execution.
  *
  * @example
  * ```ts
- * const kernel = new Kernel({ name: 'my-app', debug: true });
+ * const kernel = new Kernel({ name: 'my-app' });
  *
- * const agent = new Agent({ name: 'researcher', ... });
+ * const agent = new Agent({
+ *   name: 'researcher',
+ *   handler: async (ctx) => {
+ *     await ctx.memory.set('status', 'working');
+ *     return `Researched: ${ctx.input}`;
+ *   },
+ * });
+ *
  * kernel.register(agent);
- *
- * const process = await kernel.spawn('researcher');
- * console.log(process.state); // 'running'
- *
- * await kernel.terminate(process.id);
+ * const proc = await kernel.spawn('researcher');
+ * const result = await kernel.execute(proc.id, { task: 'find AI news' });
+ * console.log(result.output);
  * ```
  */
 export class Kernel {
@@ -35,6 +48,15 @@ export class Kernel {
   private _config: KernelConfig;
   private _processCounter: number;
 
+  /** Built-in memory bus — auto-allocates per-process namespaces */
+  readonly memory: MemoryBus;
+
+  /** Built-in tool router — register tools, kernel enforces permissions */
+  readonly tools: ToolRouter;
+
+  /** Built-in message broker — pub/sub and direct messaging */
+  readonly broker: MessageBroker;
+
   constructor(config: KernelConfig = {}) {
     this.name = config.name ?? 'agentvm';
     this._agents = new Map();
@@ -43,7 +65,10 @@ export class Kernel {
     this._config = config;
     this._processCounter = 0;
 
-    // Register initial event handlers
+    this.memory = new MemoryBus();
+    this.tools = new ToolRouter();
+    this.broker = new MessageBroker();
+
     if (config.on) {
       for (const [event, handler] of Object.entries(config.on)) {
         this.on(event, handler);
@@ -57,9 +82,6 @@ export class Kernel {
   // Agent Registration
   // ──────────────────────────────────────────────
 
-  /**
-   * Register one or more agents with the kernel.
-   */
   register(...agents: Agent[]): void {
     for (const agent of agents) {
       if (this._agents.has(agent.name)) {
@@ -70,55 +92,59 @@ export class Kernel {
     }
   }
 
-  /**
-   * Unregister an agent. Fails if it has running processes.
-   */
   unregister(agentName: string): void {
     const running = this.getProcesses({ agentName, state: 'running' as ProcessState });
     if (running.length > 0) {
       throw new Error(
-        `Cannot unregister "${agentName}": ${running.length} process(es) still running`,
+        `Cannot unregister "${agentName}": ${running.length} process(es) still running`
       );
     }
     this._agents.delete(agentName);
     this._emit('agent:unregistered', { name: agentName });
   }
 
-  /**
-   * Get a registered agent by name.
-   */
   getAgent(name: string): Agent | undefined {
     return this._agents.get(name);
   }
 
-  /**
-   * List all registered agents.
-   */
   get agents(): Agent[] {
     return Array.from(this._agents.values());
+  }
+
+  // ──────────────────────────────────────────────
+  // Tool Registration (convenience)
+  // ──────────────────────────────────────────────
+
+  registerTool(tool: ToolDefinition): void {
+    this.tools.register(tool);
+    this._emit('tool:registered', { name: tool.name });
+  }
+
+  // ──────────────────────────────────────────────
+  // Channel Management (convenience)
+  // ──────────────────────────────────────────────
+
+  createChannel(config: ChannelConfig): void {
+    this.broker.createChannel(config);
+    this._emit('channel:created', { name: config.name });
   }
 
   // ──────────────────────────────────────────────
   // Process Lifecycle
   // ──────────────────────────────────────────────
 
-  /**
-   * Spawn a new process for a registered agent.
-   */
   async spawn(agentName: string, options: ProcessOptions = {}): Promise<Process> {
     const agent = this._agents.get(agentName);
     if (!agent) {
       throw new Error(`Agent "${agentName}" is not registered. Call kernel.register() first.`);
     }
 
-    // Check process limit
     const maxProc = this._config.maxProcesses ?? Infinity;
     const activeCount = this.getProcesses({ active: true }).length;
     if (activeCount >= maxProc) {
       throw new Error(`Process limit reached (${maxProc}). Terminate a process before spawning.`);
     }
 
-    // Create process
     const id = options.id ?? this._generateId(agentName);
     const process = new Process(id, agentName, options);
 
@@ -130,36 +156,164 @@ export class Kernel {
     return process;
   }
 
+  // ──────────────────────────────────────────────
+  // Task Execution
+  // ──────────────────────────────────────────────
+
   /**
-   * Pause a running process.
+   * Execute a task on a running process.
+   *
+   * Builds an ExecutionContext with memory, tools, and messaging,
+   * then calls the agent's handler function.
    */
+  async execute(processId: string, taskInput: TaskInput): Promise<ExecutionResult> {
+    const process = this._getProcess(processId);
+
+    if (process.state !== ('running' as ProcessState)) {
+      throw new Error(
+        `Cannot execute on process "${processId}": state is "${process.state}", expected "running"`
+      );
+    }
+
+    const agent = this._agents.get(process.agentName);
+    if (!agent) {
+      throw new Error(`Agent "${process.agentName}" is no longer registered`);
+    }
+
+    if (!agent.handler) {
+      throw new Error(
+        `Agent "${agent.name}" has no handler function. Define a handler in the agent config.`
+      );
+    }
+
+    const context = this._buildContext(process, agent, taskInput);
+
+    const startTime = Date.now();
+    this._emit('execution:started', {
+      processId,
+      agentName: agent.name,
+      task: taskInput.task,
+    });
+
+    try {
+      const output = await agent.handler(context);
+      const duration = Date.now() - startTime;
+
+      const result: ExecutionResult = {
+        processId: process.id,
+        agentName: agent.name,
+        output,
+        duration,
+        events: [...process.events],
+      };
+
+      process.setMetadata('lastExecution', {
+        task: taskInput.task,
+        duration,
+        completedAt: new Date().toISOString(),
+        success: true,
+      });
+
+      this._emit('execution:completed', { processId, agentName: agent.name, duration });
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const err = error instanceof Error ? error : new Error(String(error));
+
+      process.setMetadata('lastExecution', {
+        task: taskInput.task,
+        duration,
+        completedAt: new Date().toISOString(),
+        success: false,
+        error: err.message,
+      });
+
+      this._emit('execution:failed', {
+        processId,
+        agentName: agent.name,
+        duration,
+        error: err.message,
+      });
+
+      process._crash(err);
+      throw err;
+    }
+  }
+
+  /**
+   * Build the ExecutionContext that gets passed to agent handlers.
+   */
+  private _buildContext(process: Process, agent: Agent, taskInput: TaskInput): ExecutionContext {
+    const memoryAccessor = this.memory.getAccessor(process.id);
+
+    return {
+      processId: process.id,
+      agentName: agent.name,
+      input: taskInput.input ?? taskInput.task,
+
+      memory: memoryAccessor,
+
+      useTool: async (toolName: string, params: unknown) => {
+        if (agent.tools.length > 0 && !agent.tools.includes(toolName)) {
+          throw new Error(
+            `Agent "${agent.name}" is not allowed to use tool "${toolName}". ` +
+            `Allowed tools: ${agent.tools.join(', ')}`
+          );
+        }
+
+        this._emit('tool:invoked', { processId: process.id, agentName: agent.name, tool: toolName });
+
+        const result = await this.tools.invoke(toolName, params, {
+          agentName: agent.name,
+          processId: process.id,
+          signal: process.signal,
+        });
+
+        this._emit('tool:completed', { processId: process.id, tool: toolName });
+        return result;
+      },
+
+      publish: (channel: string, data: unknown) => {
+        this.broker.publish(channel, process.id, data);
+        this._emit('message:published', { processId: process.id, channel });
+      },
+
+      emit: (event: string, data?: unknown) => {
+        this._emit(`agent:${event}`, { processId: process.id, agentName: agent.name, data });
+      },
+
+      signal: process.signal,
+    };
+  }
+
+  // ──────────────────────────────────────────────
+  // Process Management
+  // ──────────────────────────────────────────────
+
   async pause(processId: string): Promise<void> {
     const process = this._getProcess(processId);
     process._pause();
     this._emit('process:paused', { id: processId });
   }
 
-  /**
-   * Resume a paused process.
-   */
   async resume(processId: string): Promise<void> {
     const process = this._getProcess(processId);
     process._resume();
     this._emit('process:resumed', { id: processId });
   }
 
-  /**
-   * Terminate a process.
-   */
   async terminate(processId: string): Promise<void> {
     const process = this._getProcess(processId);
     process._terminate();
+
+    const agent = this._agents.get(process.agentName);
+    if (!agent?.memory?.persistent) {
+      this.memory.deleteNamespace(processId);
+    }
+
     this._emit('process:terminated', { id: processId });
   }
 
-  /**
-   * Terminate all processes and shut down the kernel.
-   */
   async shutdown(): Promise<void> {
     const active = this.getProcesses({ active: true });
     for (const p of active) {
@@ -168,23 +322,15 @@ export class Kernel {
     this._emit('kernel:shutdown', { name: this.name });
   }
 
-  /**
-   * Get a process by ID.
-   */
   getProcess(id: string): Process | undefined {
     return this._processes.get(id);
   }
 
-  /**
-   * Query processes by filter criteria.
-   */
-  getProcesses(
-    filter: {
-      agentName?: string;
-      state?: ProcessState;
-      active?: boolean;
-    } = {},
-  ): Process[] {
+  getProcesses(filter: {
+    agentName?: string;
+    state?: ProcessState;
+    active?: boolean;
+  } = {}): Process[] {
     let results = Array.from(this._processes.values());
 
     if (filter.agentName) {
@@ -195,7 +341,7 @@ export class Kernel {
     }
     if (filter.active) {
       results = results.filter(
-        (p) => p.state === ('running' as ProcessState) || p.state === ('paused' as ProcessState),
+        (p) => p.state === ('running' as ProcessState) || p.state === ('paused' as ProcessState)
       );
     }
 
@@ -206,24 +352,14 @@ export class Kernel {
   // Events
   // ──────────────────────────────────────────────
 
-  /**
-   * Subscribe to kernel events.
-   */
   on(event: string, handler: EventHandler): () => void {
     if (!this._eventHandlers.has(event)) {
       this._eventHandlers.set(event, new Set());
     }
     this._eventHandlers.get(event)!.add(handler);
-
-    // Return unsubscribe function
-    return () => {
-      this._eventHandlers.get(event)?.delete(handler);
-    };
+    return () => { this._eventHandlers.get(event)?.delete(handler); };
   }
 
-  /**
-   * Subscribe to all events.
-   */
   onAny(handler: EventHandler): () => void {
     return this.on('*', handler);
   }
@@ -237,27 +373,17 @@ export class Kernel {
       data,
     };
 
-    // Notify specific handlers
     const handlers = this._eventHandlers.get(type);
     if (handlers) {
       for (const handler of handlers) {
-        try {
-          handler(event);
-        } catch {
-          // Don't let event handler errors crash the kernel
-        }
+        try { handler(event); } catch { /* swallow */ }
       }
     }
 
-    // Notify wildcard handlers
     const wildcardHandlers = this._eventHandlers.get('*');
     if (wildcardHandlers) {
       for (const handler of wildcardHandlers) {
-        try {
-          handler(event);
-        } catch {
-          // Swallow
-        }
+        try { handler(event); } catch { /* swallow */ }
       }
     }
 
