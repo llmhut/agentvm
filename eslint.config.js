@@ -23,6 +23,13 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/cli/**/*.ts'],
+    rules: {
+      'no-console': 'off',
+      'no-control-regex': 'off',
+    },
+  },
+  {
     ignores: ['dist/', 'node_modules/', 'tests/', 'examples/', '*.config.*'],
   },
 );
