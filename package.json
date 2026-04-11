@@ -23,7 +23,16 @@
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "prepare": "husky",
+    "coverage:check": "vitest run --coverage && node scripts/check-coverage.js"
+
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   },
   "keywords": [
     "ai",
@@ -59,6 +68,8 @@
     "@types/node": "^20.0.0",
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.5.0",

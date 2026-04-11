@@ -31,10 +31,7 @@
  */
 
 import { Agent } from '../core/agent';
-import type {
-  AgentConfig,
-  ExecutionContext,
-} from '../core/types';
+import type { AgentConfig, ExecutionContext } from '../core/types';
 
 // ──────────────────────────────────────────────
 // Types
@@ -293,12 +290,12 @@ async function callAnthropic(
   messages: LLMMessage[],
   tools: ToolSchema[],
   maxTokens: number,
-  temperature: number
+  temperature: number,
 ): Promise<LLMResponse> {
   const apiKey = config.apiKey ?? process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     throw new Error(
-      'Anthropic API key required. Set ANTHROPIC_API_KEY env var or pass apiKey in config.'
+      'Anthropic API key required. Set ANTHROPIC_API_KEY env var or pass apiKey in config.',
     );
   }
 
@@ -394,12 +391,12 @@ async function callOpenAI(
   messages: LLMMessage[],
   tools: ToolSchema[],
   maxTokens: number,
-  temperature: number
+  temperature: number,
 ): Promise<LLMResponse> {
   const apiKey = config.apiKey ?? process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      'OpenAI API key required. Set OPENAI_API_KEY env var or pass apiKey in config.'
+      'OpenAI API key required. Set OPENAI_API_KEY env var or pass apiKey in config.',
     );
   }
 
@@ -507,7 +504,7 @@ interface ToolSchema {
  */
 async function getToolSchemasFromMemory(
   ctx: ExecutionContext,
-  toolNames: string[]
+  toolNames: string[],
 ): Promise<ToolSchema[]> {
   const schemas = (await ctx.memory.get('__tool_schemas')) as ToolSchema[] | undefined;
   if (schemas && schemas.length > 0) {
@@ -546,8 +543,12 @@ async function getToolSchemasFromMemory(
  * ```
  */
 export async function createPipeline(
-  kernel: { register: (...agents: Agent[]) => void; spawn: (name: string) => Promise<{ id: string }>; execute: (id: string, task: { task: string; input?: unknown }) => Promise<{ output: unknown }> },
-  agents: Agent[]
+  kernel: {
+    register: (...agents: Agent[]) => void;
+    spawn: (name: string) => Promise<{ id: string }>;
+    execute: (id: string, task: { task: string; input?: unknown }) => Promise<{ output: unknown }>;
+  },
+  agents: Agent[],
 ): Promise<(input: string) => Promise<unknown>> {
   // Register all agents
   kernel.register(...agents);

@@ -1,7 +1,19 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
-import { c, success, info, warn, error, log, header, stateBadge, sym, table, formatDuration } from '../utils.js';
+import {
+  c,
+  success,
+  info,
+  warn,
+  error,
+  log,
+  header,
+  stateBadge,
+  sym,
+  table,
+  formatDuration,
+} from '../utils.js';
 import type { Kernel } from '../../core/kernel.js';
 
 export async function startCommand(options: { config: string; debug: boolean }): Promise<void> {
@@ -15,7 +27,9 @@ export async function startCommand(options: { config: string; debug: boolean }):
   if (!fs.existsSync(configPath)) {
     error(`Config file not found: ${options.config}`);
     log('');
-    info(`Run ${c.cyan('agentvm init')} to create a new project, or specify a config with ${c.cyan('--config')}`);
+    info(
+      `Run ${c.cyan('agentvm init')} to create a new project, or specify a config with ${c.cyan('--config')}`,
+    );
     process.exit(1);
   }
 
@@ -41,7 +55,9 @@ export async function startCommand(options: { config: string; debug: boolean }):
   log(`  ${c.dim('Agents registered:')} ${kernel.agents.length}`);
 
   for (const agent of kernel.agents) {
-    log(`    ${sym.bullet} ${c.bold(agent.name)} ${c.dim(agent.description || '(no description)')}`);
+    log(
+      `    ${sym.bullet} ${c.bold(agent.name)} ${c.dim(agent.description || '(no description)')}`,
+    );
   }
 
   log('');
@@ -113,9 +129,7 @@ export async function startCommand(options: { config: string; debug: boolean }):
 
         case 'ps': {
           const showAll = args.includes('--all') || args.includes('-a');
-          const processes = showAll
-            ? kernel.getProcesses()
-            : kernel.getProcesses({ active: true });
+          const processes = showAll ? kernel.getProcesses() : kernel.getProcesses({ active: true });
 
           if (processes.length === 0) {
             info('No processes running.');
@@ -151,7 +165,10 @@ export async function startCommand(options: { config: string; debug: boolean }):
 
         case 'pause': {
           const pid = args[0];
-          if (!pid) { warn('Usage: pause <process-id>'); break; }
+          if (!pid) {
+            warn('Usage: pause <process-id>');
+            break;
+          }
           await kernel.pause(pid);
           success(`Process ${c.bold(pid)} paused.`);
           break;
@@ -159,7 +176,10 @@ export async function startCommand(options: { config: string; debug: boolean }):
 
         case 'resume': {
           const pid = args[0];
-          if (!pid) { warn('Usage: resume <process-id>'); break; }
+          if (!pid) {
+            warn('Usage: resume <process-id>');
+            break;
+          }
           await kernel.resume(pid);
           success(`Process ${c.bold(pid)} resumed.`);
           break;
@@ -167,9 +187,15 @@ export async function startCommand(options: { config: string; debug: boolean }):
 
         case 'logs': {
           const pid = args[0];
-          if (!pid) { warn('Usage: logs <process-id>'); break; }
+          if (!pid) {
+            warn('Usage: logs <process-id>');
+            break;
+          }
           const proc = kernel.getProcess(pid);
-          if (!proc) { error(`Process "${pid}" not found.`); break; }
+          if (!proc) {
+            error(`Process "${pid}" not found.`);
+            break;
+          }
           const events = proc.events.slice(-20);
           if (events.length === 0) {
             info('No events recorded.');

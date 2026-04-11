@@ -49,11 +49,7 @@ export class ToolRouter {
   /**
    * Invoke a tool with permission and rate limit checks.
    */
-  async invoke(
-    toolName: string,
-    params: unknown,
-    context: ToolContext
-  ): Promise<unknown> {
+  async invoke(toolName: string, params: unknown, context: ToolContext): Promise<unknown> {
     const tool = this._tools.get(toolName);
     if (!tool) {
       throw new ToolNotFoundError(toolName);
@@ -71,7 +67,7 @@ export class ToolRouter {
     } catch (error) {
       throw new ToolExecutionError(
         toolName,
-        error instanceof Error ? error.message : String(error)
+        error instanceof Error ? error.message : String(error),
       );
     }
   }

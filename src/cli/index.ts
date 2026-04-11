@@ -9,10 +9,7 @@ import { logsCommand } from './commands/logs.js';
 
 const program = new Command();
 
-program
-  .name('agentvm')
-  .description('The runtime your AI agents deserve')
-  .version('0.1.0-alpha.1');
+program.name('agentvm').description('The runtime your AI agents deserve').version('0.1.0-alpha.1');
 
 program
   .command('init [name]')

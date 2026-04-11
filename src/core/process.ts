@@ -78,7 +78,7 @@ export class Process {
 
   /** @internal Called by Kernel */
   _terminate(): void {
-    if (this._state === 'terminated' as ProcessState) return;
+    if (this._state === ('terminated' as ProcessState)) return;
     this._state = 'terminated' as ProcessState;
     this._terminatedAt = new Date();
     this._abortController.abort();
@@ -124,7 +124,7 @@ export class Process {
   private _assertState(expected: string, action: string): void {
     if (this._state !== expected) {
       throw new Error(
-        `Cannot ${action} process ${this.id}: expected state "${expected}" but got "${this._state}"`
+        `Cannot ${action} process ${this.id}: expected state "${expected}" but got "${this._state}"`,
       );
     }
   }

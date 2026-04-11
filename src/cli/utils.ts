@@ -90,13 +90,11 @@ export function stateBadge(state: ProcessState | string): string {
 
 export function table(headers: string[], rows: string[][]): void {
   const colWidths = headers.map((h, i) =>
-    Math.max(h.length, ...rows.map((r) => stripAnsi(r[i] ?? '').length))
+    Math.max(h.length, ...rows.map((r) => stripAnsi(r[i] ?? '').length)),
   );
 
   const divider = colWidths.map((w) => '─'.repeat(w + 2)).join('┼');
-  const headerRow = headers
-    .map((h, i) => ` ${c.bold(h.padEnd(colWidths[i]))} `)
-    .join('│');
+  const headerRow = headers.map((h, i) => ` ${c.bold(h.padEnd(colWidths[i]))} `).join('│');
 
   console.log();
   console.log(`  ${headerRow}`);
