@@ -11,64 +11,113 @@
 ## Component Diagram
 
 ```
-                         ┌──────────────────────┐
-                         │     User Code /       │
-                         │   Agent Framework     │
-                         └──────────┬───────────┘
-                                    │
-                         ┌──────────▼───────────┐
-                         │       Kernel          │
-                         │   (Orchestrator)      │
-                         └──┬───┬───┬───┬───┬───┘
-                            │   │   │   │   │
-              ┌─────────────┘   │   │   │   └─────────────┐
-              │           ┌─────┘   │   └─────┐           │
-              ▼           ▼         ▼         ▼           ▼
-        ┌──────────┐┌──────────┐┌────────┐┌──────────┐┌──────────┐
-        │ Process  ││  Memory  ││  Tool  ││ Message  ││Scheduler │
-        │ Manager  ││   Bus    ││ Router ││  Broker  ││          │
-        └──────────┘└──────────┘└────────┘└──────────┘└──────────┘
+                      ┌──────────────────────────────────┐
+                      │    Your Code / Agent Framework    │
+                      └─────────────────┬────────────────┘
+                                        │
+              ┌─────────────────────────▼────────────────────────┐
+              │                      Kernel                       │
+              │              (Central Orchestrator)               │
+              └──┬──────┬──────┬──────┬──────┬──────┬───────────┘
+                 │      │      │      │      │      │
+         ┌───────┘  ┌───┘  ┌───┘  ┌───┘  ┌───┘  ┌───┘
+         ▼          ▼      ▼      ▼      ▼      ▼
+    ┌─────────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌───────┐ ┌──────────┐
+    │ Process │ │Memory│ │ Tool │ │Broker│ │Sched- │ │LLM Agent │
+    │ Manager │ │ Bus  │ │Router│ │      │ │ uler  │ │+ MCP     │
+    └─────────┘ └──────┘ └──────┘ └──────┘ └───────┘ └──────────┘
+                              │                           │
+                    ┌─────────┘                 ┌─────────┘
+                    ▼                           ▼
+              ┌──────────┐              ┌──────────────┐
+              │ Built-in │              │  MCP Servers  │
+              │  Tools   │              │ (stdio / SSE) │
+              └──────────┘              └──────────────┘
 ```
 
-## Data Flow
+## Module Responsibilities
 
-### Spawning an Agent
+**Process Manager** — `Kernel` owns the `Process` registry. Each process is an isolated execution unit with its own lifecycle, metadata, and AbortSignal.
+
+**Memory Bus** — Namespaced key-value store. Each process gets an isolated namespace. All processes can access `__shared__`. Pluggable backends (SQLite, Redis) coming in v0.3.0.
+
+**Tool Router** — Central registry for tools. Handles registration, permission checking, rate limiting, and invocation. Agents declare which tools they can use; the kernel enforces this at execution time.
+
+**Message Broker** — Pub/sub and direct channels for inter-agent communication. Typed messages, configurable history, subscriber error isolation.
+
+**Scheduler** — Multi-strategy task execution: `sequential`, `parallel` (layer-based dependency resolution), `race`, `conditional`. Supports retry with fixed or exponential backoff.
+
+**LLM Agent** — `createLLMAgent()` factory that wraps the Anthropic or OpenAI API in an agentic tool loop. Conversation history and token usage are stored in process memory.
+
+**MCP Client** — Connects to MCP servers (stdio or SSE), discovers their tools, and auto-registers them with the `ToolRouter` as `mcp:<server>:<tool>`.
+
+## Key Data Flows
+
+### Spawning an agent
 
 ```
 kernel.spawn('researcher')
   → Validate agent is registered
-  → Check process limit
-  → Create Process instance (state: created)
-  → Transition to 'starting'
-  → Allocate working memory namespace
-  → Transition to 'running'
-  → Emit 'process:spawned' event
+  → Check process limit (maxProcesses)
+  → Create Process (state: created → running)
+  → Allocate memory namespace
+  → Inject __tool_schemas into process memory
+  → Emit 'process:spawned'
   → Return Process handle
 ```
 
-### Tool Invocation
+### Executing a task
 
 ```
-context.useTool('web_search', { query: '...' })
-  → ToolRouter.invoke()
-  → Check tool exists
-  → Check agent has permission
-  → Check rate limit
-  → Execute handler in sandbox
-  → Emit 'tool:invoked' event
-  → Return result
+kernel.execute(proc.id, { task: '...' })
+  → Validate process is running
+  → Build ExecutionContext (memory, useTool, publish, emit, signal)
+  → Emit 'execution:started'
+  → Call agent.handler(ctx)
+    → ctx.useTool('x', params)
+        → Check agent tool allowlist
+        → Emit 'tool:invoked'
+        → ToolRouter.invoke() → rate limit → handler()
+        → Emit 'tool:completed'
+        → Return result
+    → ctx.publish('channel', data)
+        → MessageBroker.publish()
+        → Deliver to all channel subscribers
+        → Emit 'message:published'
+  → Emit 'execution:completed'
+  → Return ExecutionResult
 ```
 
-### Message Passing
+### LLM agentic loop
 
 ```
-agent1.publish('updates', data)
-  → MessageBroker.publish()
-  → Validate channel exists
-  → Create Message object
-  → Store in channel history
-  → Deliver to all subscribers (except sender)
-  → Emit 'message:published' event
+createLLMAgent handler(ctx)
+  → Load conversation history from ctx.memory.__llm_messages
+  → Append user message
+  → Loop up to maxTurns:
+      → Call Anthropic/OpenAI API with messages + tool schemas
+      → Emit llm:call, llm:response via ctx.emit()
+      → If tool_use in response:
+          → ctx.useTool(name, args) for each tool call
+          → Append tool results to history
+      → If text response:
+          → Set as finalResponse, break
+  → Save updated history to ctx.memory.__llm_messages
+  → Return finalResponse
+```
+
+### MCP tool discovery
+
+```
+mcp.connect({ name: 'filesystem', transport: 'stdio', command: 'npx', args: [...] })
+  → Spawn child process
+  → JSON-RPC initialize handshake
+  → tools/list → discover MCPTool[]
+  → resources/list → discover MCPResource[]
+  → For each tool:
+      → Register as ToolDefinition named mcp:filesystem:<tool.name>
+      → handler: (params) => mcp.callTool(serverName, tool.name, params)
+  → Return MCPTool[]
 ```
 
 ## Process State Machine
@@ -81,74 +130,90 @@ agent1.publish('updates', data)
          ┌────▼─────┐
          │ Starting │
          └────┬─────┘
-              │
-         ┌────▼─────┐     _pause()    ┌────────┐
-         │ Running  │ ──────────────► │ Paused │
-         └────┬─────┘ ◄────────────── └────────┘
-              │            _resume()
-              │
-    ┌─────────┼─────────┐
-    │ _terminate()       │ _crash()
-    ▼                    ▼
-┌────────────┐    ┌─────────┐
-│ Terminated │    │ Crashed │
-└────────────┘    └─────────┘
+              │ (automatic)
+         ┌────▼─────┐  _pause()   ┌────────┐
+         │ Running  │ ──────────► │ Paused │
+         └────┬─────┘ ◄────────── └────────┘
+              │         _resume()
+    ┌─────────┼──────────────┐
+    │_terminate()            │ _crash(err)
+    ▼                        ▼
+┌────────────┐         ┌─────────┐
+│ Terminated │         │ Crashed │
+└────────────┘         └─────────┘
 ```
+
+Terminal states: `terminated` and `crashed`. No restart from either — spawn a new process. Checkpointing (v0.3.0) will enable crash recovery.
+
+See [RFC-001](../rfcs/RFC-001-PROCESS-STATE-MACHINE.md) for the full state machine specification.
 
 ## Memory Architecture
 
 ```
                     MemoryBus
-                    ┌──────────────────────────┐
-                    │                          │
-    Process A ──►   │  Namespace: "proc-a"     │  ◄── Isolated
-                    │  ┌─────────────────┐     │
-                    │  │ key → value     │     │
-                    │  └─────────────────┘     │
-                    │                          │
-    Process B ──►   │  Namespace: "proc-b"     │  ◄── Isolated
-                    │  ┌─────────────────┐     │
-                    │  │ key → value     │     │
-                    │  └─────────────────┘     │
-                    │                          │
-    Any Process ──► │  Namespace: "__shared__"  │  ◄── Shared
-                    │  ┌─────────────────┐     │
-                    │  │ key → value     │     │
-                    │  └─────────────────┘     │
-                    └──────────────────────────┘
+          ┌─────────────────────────────┐
+          │                             │
+  proc-a  │  namespace: "proc-a"        │  ← isolated, deleted on terminate
+          │  { key → MemoryEntry }      │
+          │                             │
+  proc-b  │  namespace: "proc-b"        │  ← isolated, deleted on terminate
+          │  { key → MemoryEntry }      │
+          │                             │
+  anyone  │  namespace: "__shared__"    │  ← cross-process, kernel lifetime
+          │  { key → MemoryEntry }      │
+          └─────────────────────────────┘
 ```
+
+Reserved keys (set by AgentVM internals, prefixed `__`):
+- `__tool_schemas` — injected at spawn, consumed by `createLLMAgent()`
+- `__llm_messages` — conversation history for multi-turn LLM agents
+- `__llm_usage` — cumulative `{ inputTokens, outputTokens }` per process
+
+See [RFC-002](../rfcs/RFC-002-MEMORY-BUS-INTERFACE.md) for the full memory contract.
 
 ## Event System
 
-Every operation in AgentVM emits a structured event:
+Every operation emits a `KernelEvent`:
 
 ```typescript
 interface KernelEvent {
-  id: string;        // Unique event ID
-  type: string;      // e.g., 'process:spawned', 'tool:invoked'
-  source: string;    // Emitter ID (kernel name or process ID)
-  timestamp: Date;   // When it happened
-  data?: unknown;    // Event-specific payload
+  id: string;        // "evt-<timestamp>-<random>"
+  type: string;      // e.g. 'process:spawned', 'tool:invoked'
+  source: string;    // kernel name
+  timestamp: Date;
+  data?: unknown;    // event-specific payload
 }
 ```
 
-### Event Types
+Subscribe with `kernel.on(type, handler)` or `kernel.onAny(handler)`. Handler errors are swallowed — a broken logger cannot crash the kernel.
 
-| Event | Emitted When |
-|-------|-------------|
-| `kernel:started` | Kernel is initialized |
-| `kernel:shutdown` | Kernel is shutting down |
-| `agent:registered` | An agent definition is registered |
-| `process:spawned` | A new process is created and started |
-| `process:paused` | A running process is paused |
-| `process:resumed` | A paused process is resumed |
-| `process:terminated` | A process is terminated |
-| `process:crashed` | A process crashes due to an unhandled error |
-| `tool:invoked` | A tool is called |
-| `tool:completed` | A tool call completes |
-| `tool:failed` | A tool call fails |
-| `message:published` | A message is published to a channel |
-| `memory:read` | A memory value is read |
-| `memory:write` | A memory value is written |
+See [RFC-003](../rfcs/RFC-003-EVENT-SCHEMA.md) for the full event catalog and payload shapes.
 
-This event stream is the foundation for observability tools like AgentTrace.
+## Source Layout
+
+```
+src/
+  core/
+    kernel.ts       ← Kernel: orchestrator, spawn, execute, events
+    agent.ts        ← Agent: definition, name validation
+    process.ts      ← Process: state machine, AbortController, metadata
+    types.ts        ← All shared interfaces and enums
+  memory/
+    bus.ts          ← MemoryBus + MemoryStore (in-memory backend)
+  tools/
+    router.ts       ← ToolRouter: registry, invoke, rate limiting, errors
+  broker/
+    broker.ts       ← MessageBroker + Channel: pub/sub, direct, history
+  scheduler/
+    scheduler.ts    ← Scheduler: strategies, dependency layers, retry
+  llm/
+    agent.ts        ← createLLMAgent(), createPipeline(), Anthropic+OpenAI adapters
+  mcp/
+    client.ts       ← MCPClient: stdio/SSE transports, JSON-RPC, tool bridge
+  builtins/
+    tools.ts        ← http_fetch, json_fetch, shell_exec, file_read, file_write, wait
+  cli/
+    index.ts        ← CLI entry point (commander)
+    commands/       ← init, start, spawn, ps, kill, logs
+  index.ts          ← Public API surface
+```
