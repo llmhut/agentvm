@@ -96,7 +96,7 @@ export class Kernel {
     const running = this.getProcesses({ agentName, state: 'running' as ProcessState });
     if (running.length > 0) {
       throw new Error(
-        `Cannot unregister "${agentName}": ${running.length} process(es) still running`
+        `Cannot unregister "${agentName}": ${running.length} process(es) still running`,
       );
     }
     this._agents.delete(agentName);
@@ -151,6 +151,17 @@ export class Kernel {
     this._processes.set(id, process);
     process._start();
 
+    // Inject tool schemas into process memory so LLM agents can discover them
+    if (agent.tools.length > 0) {
+      const accessor = this.memory.getAccessor(id);
+      const schemas = this.tools.getAvailableTools(agent.tools).map((t) => ({
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters,
+      }));
+      await accessor.set('__tool_schemas', schemas);
+    }
+
     this._emit('process:spawned', { id, agentName });
 
     return process;
@@ -171,7 +182,7 @@ export class Kernel {
 
     if (process.state !== ('running' as ProcessState)) {
       throw new Error(
-        `Cannot execute on process "${processId}": state is "${process.state}", expected "running"`
+        `Cannot execute on process "${processId}": state is "${process.state}", expected "running"`,
       );
     }
 
@@ -182,7 +193,7 @@ export class Kernel {
 
     if (!agent.handler) {
       throw new Error(
-        `Agent "${agent.name}" has no handler function. Define a handler in the agent config.`
+        `Agent "${agent.name}" has no handler function. Define a handler in the agent config.`,
       );
     }
 
@@ -257,11 +268,15 @@ export class Kernel {
         if (agent.tools.length > 0 && !agent.tools.includes(toolName)) {
           throw new Error(
             `Agent "${agent.name}" is not allowed to use tool "${toolName}". ` +
-            `Allowed tools: ${agent.tools.join(', ')}`
+              `Allowed tools: ${agent.tools.join(', ')}`,
           );
         }
 
-        this._emit('tool:invoked', { processId: process.id, agentName: agent.name, tool: toolName });
+        this._emit('tool:invoked', {
+          processId: process.id,
+          agentName: agent.name,
+          tool: toolName,
+        });
 
         const result = await this.tools.invoke(toolName, params, {
           agentName: agent.name,
@@ -326,11 +341,13 @@ export class Kernel {
     return this._processes.get(id);
   }
 
-  getProcesses(filter: {
-    agentName?: string;
-    state?: ProcessState;
-    active?: boolean;
-  } = {}): Process[] {
+  getProcesses(
+    filter: {
+      agentName?: string;
+      state?: ProcessState;
+      active?: boolean;
+    } = {},
+  ): Process[] {
     let results = Array.from(this._processes.values());
 
     if (filter.agentName) {
@@ -341,7 +358,7 @@ export class Kernel {
     }
     if (filter.active) {
       results = results.filter(
-        (p) => p.state === ('running' as ProcessState) || p.state === ('paused' as ProcessState)
+        (p) => p.state === ('running' as ProcessState) || p.state === ('paused' as ProcessState),
       );
     }
 
@@ -357,7 +374,9 @@ export class Kernel {
       this._eventHandlers.set(event, new Set());
     }
     this._eventHandlers.get(event)!.add(handler);
-    return () => { this._eventHandlers.get(event)?.delete(handler); };
+    return () => {
+      this._eventHandlers.get(event)?.delete(handler);
+    };
   }
 
   onAny(handler: EventHandler): () => void {
@@ -376,14 +395,22 @@ export class Kernel {
     const handlers = this._eventHandlers.get(type);
     if (handlers) {
       for (const handler of handlers) {
-        try { handler(event); } catch { /* swallow */ }
+        try {
+          handler(event);
+        } catch {
+          /* swallow */
+        }
       }
     }
 
     const wildcardHandlers = this._eventHandlers.get('*');
     if (wildcardHandlers) {
       for (const handler of wildcardHandlers) {
-        try { handler(event); } catch { /* swallow */ }
+        try {
+          handler(event);
+        } catch {
+          /* swallow */
+        }
       }
     }
 

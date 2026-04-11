@@ -35,7 +35,7 @@ export class Agent {
 
     if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(config.name)) {
       throw new Error(
-        `Invalid agent name "${config.name}". Must start with a letter and contain only letters, numbers, hyphens, and underscores.`
+        `Invalid agent name "${config.name}". Must start with a letter and contain only letters, numbers, hyphens, and underscores.`,
       );
     }
 

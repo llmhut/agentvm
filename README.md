@@ -43,20 +43,7 @@ Every AI agent framework reinvents the same infrastructure: process lifecycle, m
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Your Agent Framework                       │
-│              (LangChain, CrewAI, AutoGen, yours)             │
-├─────────────────────────────────────────────────────────────┤
-│                      AgentVM API                         │
-├──────────┬──────────┬──────────┬──────────┬─────────────────┤
-│ Process  │  Memory  │   Tool   │ Message  │    Scheduler    │
-│ Manager  │   Bus    │  Router  │  Broker  │                 │
-├──────────┴──────────┴──────────┴──────────┴─────────────────┤
-│                    Storage Layer                              │
-│            (SQLite · Redis · PostgreSQL · S3)                 │
-└─────────────────────────────────────────────────────────────┘
-```
+<img src="./assets/svg/agentvm_architecture.svg" />
 
 ### Core Modules
 
@@ -69,6 +56,12 @@ Every AI agent framework reinvents the same infrastructure: process lifecycle, m
 **📨 Message Broker** — Pub/sub and direct channels for inter-agent communication. Typed messages, priority queues, and dead-letter handling.
 
 **📅 Scheduler** — Parallel, sequential, conditional, and event-driven task execution with dependency resolution.
+
+**🤖 LLM Agent Factory** — Create AI agents powered by Anthropic Claude or OpenAI with automatic tool-use loops. Just define a system prompt and tools.
+
+**🔌 MCP Client** — Connect to any MCP (Model Context Protocol) server and use its tools natively in AgentVM agents.
+
+**🧰 Built-in Tools** — Ships with `http_fetch`, `json_fetch`, `shell_exec`, `file_read`, `file_write`, and `wait` — register only what you need.
 
 ---
 
@@ -83,101 +76,138 @@ npm install @llmhut/agentvm
 ### Hello World — Your First Agent
 
 ```typescript
-import { Kernel, Agent, Tool } from '@llmhut/agentvm';
+import { Kernel, Agent } from '@llmhut/agentvm';
 
-// Initialize the kernel
 const kernel = new Kernel();
 
-// Define an agent
-const researcher = new Agent({
-  name: 'researcher',
-  description: 'Searches the web and summarizes findings',
-  tools: ['web_search', 'summarize'],
-  memory: { persistent: true },
+const greeter = new Agent({
+  name: 'greeter',
+  description: 'A friendly agent that greets people',
+  handler: async (ctx) => {
+    const count = ((await ctx.memory.get('count')) as number ?? 0) + 1;
+    await ctx.memory.set('count', count);
+    return `Hello, ${ctx.input}! (greeting #${count})`;
+  },
 });
 
-// Register and spawn
-kernel.register(researcher);
-const process = await kernel.spawn('researcher');
+kernel.register(greeter);
+const proc = await kernel.spawn('greeter');
 
-// Send a task
-const result = await process.execute({
-  task: 'Find the latest developments in agentic AI',
-});
+const result = await kernel.execute(proc.id, { task: 'World' });
+console.log(result.output); // "Hello, World! (greeting #1)"
 
-console.log(result);
-
-// Clean up
-await kernel.terminate(process.id);
+await kernel.shutdown();
 ```
 
-### Multi-Agent Workflow
+### LLM Agent with Tools
 
 ```typescript
-import { Kernel, Agent, Pipeline } from '@llmhut/agentvm';
+import { Kernel } from '@llmhut/agentvm';
+import { createLLMAgent, registerBuiltins } from '@llmhut/agentvm';
+
+const kernel = new Kernel();
+registerBuiltins(kernel); // Registers http_fetch, shell_exec, etc.
+
+const researcher = createLLMAgent({
+  name: 'researcher',
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  systemPrompt: 'You are a research assistant. Use http_fetch to gather info.',
+  tools: ['http_fetch'],
+  memory: { persistent: true },
+  maxTurns: 10,
+});
+
+kernel.register(researcher);
+const proc = await kernel.spawn('researcher');
+const result = await kernel.execute(proc.id, {
+  task: 'Find the latest Node.js LTS version',
+});
+
+console.log(result.output);
+```
+
+### Multi-Agent Pipeline
+
+```typescript
+import { Kernel } from '@llmhut/agentvm';
+import { createLLMAgent, createPipeline } from '@llmhut/agentvm';
 
 const kernel = new Kernel();
 
-// Define agents with typed contracts
-const researcher = new Agent({
+const researcher = createLLMAgent({
   name: 'researcher',
-  input: { type: 'string', description: 'Topic to research' },
-  output: { type: 'string', description: 'Raw research findings' },
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  systemPrompt: 'Research the given topic. Output a structured brief.',
+  tools: ['http_fetch'],
 });
 
-const writer = new Agent({
+const writer = createLLMAgent({
   name: 'writer',
-  input: { type: 'string', description: 'Research to turn into article' },
-  output: { type: 'string', description: 'Polished article' },
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  systemPrompt: 'Turn the research brief into a polished 600-word article.',
 });
 
-const reviewer = new Agent({
-  name: 'reviewer',
-  input: { type: 'string', description: 'Article to review' },
-  output: { type: 'object', description: 'Review with score and feedback' },
+const pipeline = await createPipeline(kernel, [researcher, writer]);
+const article = await pipeline('AI agents in 2026');
+console.log(article);
+```
+
+### MCP Integration
+
+```typescript
+import { Kernel, MCPClient, createLLMAgent } from '@llmhut/agentvm';
+
+const kernel = new Kernel();
+const mcp = new MCPClient(kernel);
+
+// Connect to any MCP server — tools auto-register with the kernel
+await mcp.connect({
+  name: 'filesystem',
+  transport: 'stdio',
+  command: 'npx',
+  args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
 });
 
-// Compose into a pipeline
-const pipeline = new Pipeline([researcher, writer, reviewer]);
-
-kernel.register(researcher, writer, reviewer);
-const result = await kernel.run(pipeline, {
-  input: 'The future of AI agents in enterprise',
+const agent = createLLMAgent({
+  name: 'file-assistant',
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  systemPrompt: 'You manage files using MCP tools.',
+  tools: ['mcp:filesystem:read_file', 'mcp:filesystem:write_file'],
 });
 
-console.log(result);
+kernel.register(agent);
+const proc = await kernel.spawn('file-assistant');
+await kernel.execute(proc.id, { task: 'Create a hello.txt file' });
 ```
 
 ### Inter-Agent Messaging
 
 ```typescript
-import { Kernel, Agent, Channel } from '@llmhut/agentvm';
+import { Kernel, Agent } from '@llmhut/agentvm';
 
 const kernel = new Kernel();
 
-// Create a shared channel
-const channel = new Channel('research-updates', {
-  type: 'pubsub',
-  schema: { topic: 'string', findings: 'string[]' },
+kernel.createChannel({ name: 'updates', type: 'pubsub', historyLimit: 100 });
+
+const producer = new Agent({
+  name: 'producer',
+  handler: async (ctx) => {
+    ctx.publish('updates', { finding: ctx.input });
+    return 'published';
+  },
 });
 
-kernel.createChannel(channel);
-
-// Agents subscribe and publish
-const agent1 = await kernel.spawn('researcher-1');
-const agent2 = await kernel.spawn('researcher-2');
-const coordinator = await kernel.spawn('coordinator');
-
-// Coordinator listens for updates
-coordinator.subscribe('research-updates', (message) => {
-  console.log(`${message.from}: found ${message.data.findings.length} results`);
+kernel.register(producer);
+kernel.broker.subscribe('updates', 'logger', (msg) => {
+  console.log(`Got update from ${msg.from}:`, msg.data);
 });
 
-// Researchers publish findings
-agent1.publish('research-updates', {
-  topic: 'LLM benchmarks',
-  findings: ['GPT-4o leads on reasoning', 'Claude excels at code'],
-});
+const proc = await kernel.spawn('producer');
+await kernel.execute(proc.id, { task: 'LLM benchmarks show Claude leading' });
 ```
 
 ---
@@ -187,23 +217,31 @@ agent1.publish('research-updates', {
 We're building in public. Here's where we're headed:
 
 ### ✅ Phase 1 — Foundation (v0.1.x) `COMPLETE`
+
 - [x] Project scaffolding and repo setup
 - [x] Agent process model (spawn / pause / resume / kill)
 - [x] In-memory state management
 - [x] Basic CLI (`agentvm start`, `agentvm ps`, `agentvm kill`)
 - [x] TypeScript SDK with full type safety
 - [x] Core event system
-- [x] 135 unit tests at 90%+ coverage
-
-### 🟢 Phase 2 — Core Engine (v0.2.x) `← WE ARE HERE`
 - [x] Tool router with permission model
 - [x] Message broker (pub/sub + direct channels)
 - [x] Event-driven scheduler with dependency resolution
+- [x] 163 unit tests
+
+### 🟢 Phase 2 — Core Engine (v0.2.x) `← WE ARE HERE`
+
+- [x] LLM Agent factory (Anthropic + OpenAI with tool loops)
+- [x] MCP client (stdio + SSE transports)
+- [x] Built-in tools (http_fetch, shell_exec, file I/O, wait)
+- [x] Multi-agent pipelines
+- [x] Tool schema injection at spawn time
 - [ ] Pluggable memory backends (SQLite, Redis)
 - [ ] Agent contracts with runtime validation
 - [ ] Configuration system (YAML + env vars)
 
 ### 🟡 Phase 3 — Ecosystem (v0.3.x)
+
 - [ ] LangChain adapter plugin
 - [ ] CrewAI adapter plugin
 - [ ] Resource monitoring and limits (tokens, time, cost)
@@ -212,6 +250,7 @@ We're building in public. Here's where we're headed:
 - [ ] Python SDK
 
 ### 🟠 Phase 4 — Production (v1.0)
+
 - [ ] Distributed mode (multi-node agent clusters)
 - [ ] Kubernetes operator
 - [ ] Admin dashboard web UI
@@ -221,6 +260,8 @@ We're building in public. Here's where we're headed:
 
 > 📋 See [ROADMAP.md](./ROADMAP.md) for the full breakdown with milestones and RFCs.
 
+---
+
 ## Project Structure
 
 ```
@@ -228,38 +269,36 @@ agentvm/
 ├── src/
 │   ├── core/              # Kernel, Agent, Process primitives
 │   │   ├── kernel.ts      # Main kernel runtime
-│   │   ├── agent.ts       # Agent definition and lifecycle
-│   │   ├── process.ts     # Process management
+│   │   ├── agent.ts       # Agent definition
+│   │   ├── process.ts     # Process state machine
 │   │   └── types.ts       # Shared type definitions
-│   ├── memory/            # Memory bus and backends
-│   │   ├── bus.ts         # Memory bus interface
-│   │   ├── working.ts     # Short-term working memory
-│   │   ├── persistent.ts  # Long-term persistent memory
-│   │   └── backends/      # SQLite, Redis, etc.
-│   ├── tools/             # Tool router and registry
-│   │   ├── router.ts      # Tool routing engine
-│   │   ├── registry.ts    # Tool registration
-│   │   ├── permissions.ts # Permission enforcement
-│   │   └── sandbox.ts     # Sandboxed execution
+│   ├── memory/            # Memory bus
+│   │   └── bus.ts         # Namespaced memory with TTL
+│   ├── tools/             # Tool router
+│   │   └── router.ts      # Registration, rate limiting, invocation
 │   ├── broker/            # Message broker
-│   │   ├── broker.ts      # Core broker
-│   │   ├── channel.ts     # Channel management
-│   │   └── pubsub.ts      # Pub/sub implementation
+│   │   └── broker.ts      # Pub/sub + direct messaging
 │   ├── scheduler/         # Task scheduler
-│   │   ├── scheduler.ts   # Scheduling engine
-│   │   ├── queue.ts       # Priority queue
-│   │   └── strategies.ts  # Parallel, sequential, conditional
-│   └── cli/               # CLI interface
-│       └── index.ts       # CLI commands
-├── tests/
-│   ├── unit/              # Unit tests
-│   └── integration/       # Integration tests
-├── docs/
-│   ├── architecture/      # Architecture decision records
-│   ├── guides/            # Developer guides
-│   └── rfcs/              # Request for comments
-├── examples/              # Example projects
-├── benchmarks/            # Performance benchmarks
+│   │   └── scheduler.ts   # 4 strategies + dependency resolution
+│   ├── llm/               # LLM agent factory
+│   │   └── agent.ts       # Anthropic + OpenAI with tool loops
+│   ├── mcp/               # MCP integration
+│   │   └── client.ts      # Stdio + SSE MCP client
+│   ├── builtins/          # Built-in tools
+│   │   └── tools.ts       # http_fetch, shell_exec, file I/O, wait
+│   ├── cli/               # CLI interface
+│   │   ├── index.ts       # CLI entry point
+│   │   └── commands/      # init, start, ps, kill, logs
+│   └── index.ts           # Public API exports
+├── tests/unit/            # 163 unit tests
+├── examples/              # Working examples
+│   ├── hello-world.ts     # Basic agent with tools and memory
+│   ├── memory-demo.ts     # Memory isolation and persistence
+│   ├── multi-agent.ts     # Multi-agent coordination
+│   ├── llm-research-agent.ts  # Real LLM agent with Claude
+│   ├── llm-pipeline.ts    # Researcher → Writer → Editor pipeline
+│   └── mcp-agent.ts       # MCP server integration
+├── docs/                  # Architecture docs, guides, RFCs
 └── package.json
 ```
 
@@ -286,6 +325,7 @@ We welcome contributions of all kinds! See [CONTRIBUTING.md](CONTRIBUTING.md) fo
 **Good first issues** are tagged with `good-first-issue` — perfect for getting started.
 
 **Ways to contribute:**
+
 - 🐛 Report bugs and request features
 - 📝 Improve documentation
 - 🧪 Write tests
