@@ -24,13 +24,36 @@ export { Process } from './core/process';
 export { MemoryBus } from './memory/bus';
 
 // Tools
-export { ToolRouter, ToolNotFoundError, ToolExecutionError, ToolRateLimitError } from './tools/router';
+export {
+  ToolRouter,
+  ToolNotFoundError,
+  ToolExecutionError,
+  ToolRateLimitError,
+} from './tools/router';
 
 // Broker
 export { MessageBroker } from './broker/broker';
 
 // Scheduler
 export { Scheduler } from './scheduler/scheduler';
+
+// MCP
+export { MCPClient } from './mcp/client';
+
+// Built-in Tools
+export {
+  httpFetchTool,
+  jsonFetchTool,
+  shellExecTool,
+  fileReadTool,
+  fileWriteTool,
+  waitTool,
+  builtinTools,
+  registerBuiltins,
+} from './builtins/tools';
+
+// LLM Agent
+export { createLLMAgent, createPipeline } from './llm/agent';
 
 // Types
 export type {
@@ -72,3 +95,9 @@ export type {
   KernelEvent,
   EventHandler,
 } from './core/types';
+
+// MCP Types
+export type { MCPServerConfig, MCPTool, MCPResource } from './mcp/client';
+
+// LLM Types
+export type { LLMAgentConfig, LLMMessage, LLMResponse } from './llm/agent';

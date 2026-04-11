@@ -392,7 +392,9 @@ describe('Kernel', () => {
 
   it('should swallow event handler errors', () => {
     const k = new Kernel();
-    k.on('test', () => { throw new Error('handler crash'); });
+    k.on('test', () => {
+      throw new Error('handler crash');
+    });
     expect(() => k['_emit']('test')).not.toThrow();
   });
 
@@ -477,7 +479,14 @@ describe('Kernel.execute()', () => {
 
   it('should crash process on handler error', async () => {
     const k = new Kernel();
-    k.register(new Agent({ name: 'a', handler: async () => { throw new Error('fail'); } }));
+    k.register(
+      new Agent({
+        name: 'a',
+        handler: async () => {
+          throw new Error('fail');
+        },
+      }),
+    );
     const p = await k.spawn('a');
 
     await expect(k.execute(p.id, { task: 'x' })).rejects.toThrow('fail');
@@ -486,7 +495,14 @@ describe('Kernel.execute()', () => {
 
   it('should handle non-Error throws', async () => {
     const k = new Kernel();
-    k.register(new Agent({ name: 'a', handler: async () => { throw 'string-error'; } }));
+    k.register(
+      new Agent({
+        name: 'a',
+        handler: async () => {
+          throw 'string-error';
+        },
+      }),
+    );
     const p = await k.spawn('a');
 
     await expect(k.execute(p.id, { task: 'x' })).rejects.toThrow('string-error');
@@ -507,7 +523,14 @@ describe('Kernel.execute()', () => {
 
   it('should store lastExecution metadata on failure', async () => {
     const k = new Kernel();
-    k.register(new Agent({ name: 'a', handler: async () => { throw new Error('x'); } }));
+    k.register(
+      new Agent({
+        name: 'a',
+        handler: async () => {
+          throw new Error('x');
+        },
+      }),
+    );
     const p = await k.spawn('a');
     await k.execute(p.id, { task: 'work' }).catch(() => {});
 
@@ -530,7 +553,14 @@ describe('Kernel.execute()', () => {
   it('should emit execution:failed on error', async () => {
     const types: string[] = [];
     const k = new Kernel({ on: { '*': (e) => types.push(e.type) } });
-    k.register(new Agent({ name: 'a', handler: async () => { throw new Error('x'); } }));
+    k.register(
+      new Agent({
+        name: 'a',
+        handler: async () => {
+          throw new Error('x');
+        },
+      }),
+    );
     const p = await k.spawn('a');
     await k.execute(p.id, { task: 'x' }).catch(() => {});
 
@@ -540,10 +570,15 @@ describe('Kernel.execute()', () => {
   it('should allow ctx.emit() for custom events', async () => {
     const types: string[] = [];
     const k = new Kernel({ on: { '*': (e) => types.push(e.type) } });
-    k.register(new Agent({
-      name: 'a',
-      handler: async (ctx) => { ctx.emit('custom', { key: 'val' }); return 'ok'; },
-    }));
+    k.register(
+      new Agent({
+        name: 'a',
+        handler: async (ctx) => {
+          ctx.emit('custom', { key: 'val' });
+          return 'ok';
+        },
+      }),
+    );
     const p = await k.spawn('a');
     await k.execute(p.id, { task: 'x' });
 
@@ -558,13 +593,15 @@ describe('Kernel.execute()', () => {
 describe('Kernel + Memory', () => {
   it('should provide isolated memory per process', async () => {
     const k = new Kernel();
-    k.register(new Agent({
-      name: 'a',
-      handler: async (ctx) => {
-        await ctx.memory.set('id', ctx.processId);
-        return await ctx.memory.get('id');
-      },
-    }));
+    k.register(
+      new Agent({
+        name: 'a',
+        handler: async (ctx) => {
+          await ctx.memory.set('id', ctx.processId);
+          return await ctx.memory.get('id');
+        },
+      }),
+    );
     const p1 = await k.spawn('a');
     const p2 = await k.spawn('a');
     const r1 = await k.execute(p1.id, { task: 'x' });
@@ -576,14 +613,16 @@ describe('Kernel + Memory', () => {
 
   it('should persist memory across multiple executions', async () => {
     const k = new Kernel();
-    k.register(new Agent({
-      name: 'counter',
-      handler: async (ctx) => {
-        const n = ((await ctx.memory.get('n')) as number ?? 0) + 1;
-        await ctx.memory.set('n', n);
-        return n;
-      },
-    }));
+    k.register(
+      new Agent({
+        name: 'counter',
+        handler: async (ctx) => {
+          const n = (((await ctx.memory.get('n')) as number) ?? 0) + 1;
+          await ctx.memory.set('n', n);
+          return n;
+        },
+      }),
+    );
     const p = await k.spawn('counter');
 
     expect((await k.execute(p.id, { task: 'x' })).output).toBe(1);
@@ -593,10 +632,15 @@ describe('Kernel + Memory', () => {
 
   it('should clean up memory on terminate (non-persistent)', async () => {
     const k = new Kernel();
-    k.register(new Agent({
-      name: 'tmp',
-      handler: async (ctx) => { await ctx.memory.set('k', 'v'); return 'ok'; },
-    }));
+    k.register(
+      new Agent({
+        name: 'tmp',
+        handler: async (ctx) => {
+          await ctx.memory.set('k', 'v');
+          return 'ok';
+        },
+      }),
+    );
     const p = await k.spawn('tmp');
     await k.execute(p.id, { task: 'x' });
     await k.terminate(p.id);
@@ -607,11 +651,16 @@ describe('Kernel + Memory', () => {
 
   it('should preserve memory on terminate when persistent', async () => {
     const k = new Kernel();
-    k.register(new Agent({
-      name: 'keep',
-      memory: { persistent: true },
-      handler: async (ctx) => { await ctx.memory.set('k', 'kept'); return 'ok'; },
-    }));
+    k.register(
+      new Agent({
+        name: 'keep',
+        memory: { persistent: true },
+        handler: async (ctx) => {
+          await ctx.memory.set('k', 'kept');
+          return 'ok';
+        },
+      }),
+    );
     const p = await k.spawn('keep');
     await k.execute(p.id, { task: 'x' });
     await k.terminate(p.id);
@@ -636,11 +685,13 @@ describe('Kernel + Tools', () => {
       permission: 'public',
       handler: async (p) => (p as number) * 2,
     });
-    k.register(new Agent({
-      name: 'a',
-      tools: ['double'],
-      handler: async (ctx) => ctx.useTool('double', 21),
-    }));
+    k.register(
+      new Agent({
+        name: 'a',
+        tools: ['double'],
+        handler: async (ctx) => ctx.useTool('double', 21),
+      }),
+    );
     const p = await k.spawn('a');
     const r = await k.execute(p.id, { task: 'x' });
     expect(r.output).toBe(42);
@@ -656,11 +707,13 @@ describe('Kernel + Tools', () => {
       permission: 'public',
       handler: async () => 'nope',
     });
-    k.register(new Agent({
-      name: 'restricted',
-      tools: ['allowed-only'],
-      handler: async (ctx) => ctx.useTool('secret', {}),
-    }));
+    k.register(
+      new Agent({
+        name: 'restricted',
+        tools: ['allowed-only'],
+        handler: async (ctx) => ctx.useTool('secret', {}),
+      }),
+    );
     const p = await k.spawn('restricted');
     await expect(k.execute(p.id, { task: 'x' })).rejects.toThrow('not allowed');
   });
@@ -675,10 +728,12 @@ describe('Kernel + Tools', () => {
       permission: 'public',
       handler: async () => 'open-access',
     });
-    k.register(new Agent({
-      name: 'open-agent',
-      handler: async (ctx) => ctx.useTool('open', {}),
-    }));
+    k.register(
+      new Agent({
+        name: 'open-agent',
+        handler: async (ctx) => ctx.useTool('open', {}),
+      }),
+    );
     const p = await k.spawn('open-agent');
     const r = await k.execute(p.id, { task: 'x' });
     expect(r.output).toBe('open-access');
@@ -695,10 +750,12 @@ describe('Kernel + Tools', () => {
       permission: 'public',
       handler: async () => null,
     });
-    k.register(new Agent({
-      name: 'a',
-      handler: async (ctx) => ctx.useTool('noop', {}),
-    }));
+    k.register(
+      new Agent({
+        name: 'a',
+        handler: async (ctx) => ctx.useTool('noop', {}),
+      }),
+    );
     const p = await k.spawn('a');
     await k.execute(p.id, { task: 'x' });
 
@@ -719,10 +776,15 @@ describe('Kernel + Broker', () => {
     const received: unknown[] = [];
     k.broker.subscribe('ch', 'listener', (m) => received.push(m.data));
 
-    k.register(new Agent({
-      name: 'pub',
-      handler: async (ctx) => { ctx.publish('ch', { msg: 'hi' }); return 'ok'; },
-    }));
+    k.register(
+      new Agent({
+        name: 'pub',
+        handler: async (ctx) => {
+          ctx.publish('ch', { msg: 'hi' });
+          return 'ok';
+        },
+      }),
+    );
     const p = await k.spawn('pub');
     await k.execute(p.id, { task: 'x' });
 
@@ -733,10 +795,15 @@ describe('Kernel + Broker', () => {
     const types: string[] = [];
     const k = new Kernel({ on: { '*': (e) => types.push(e.type) } });
     k.createChannel({ name: 'ch', type: 'pubsub' });
-    k.register(new Agent({
-      name: 'a',
-      handler: async (ctx) => { ctx.publish('ch', 'data'); return 'ok'; },
-    }));
+    k.register(
+      new Agent({
+        name: 'a',
+        handler: async (ctx) => {
+          ctx.publish('ch', 'data');
+          return 'ok';
+        },
+      }),
+    );
     const p = await k.spawn('a');
     await k.execute(p.id, { task: 'x' });
 
