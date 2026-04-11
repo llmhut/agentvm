@@ -12,144 +12,256 @@ npm install @llmhut/agentvm
 
 ## Core Concepts
 
-**Agent** — A definition/blueprint. Declares what an agent can do.
+**Agent** — A definition/blueprint. Declares what an agent can do and provides a `handler` function.
 
-**Process** — A running instance of an agent. Has a lifecycle (created → running → terminated).
+**Process** — A running instance of an agent. Has a lifecycle (`created → running → terminated`).
 
-**Kernel** — The runtime that manages agents and processes.
+**Kernel** — The runtime that manages agents, processes, memory, tools, and messaging.
 
-Think of it like this: an `Agent` is a class, a `Process` is an instance, and the `Kernel` is the runtime that manages them.
+Think of it like this: an `Agent` is a class, a `Process` is an instance, and the `Kernel` is the OS that manages them.
 
-## Step 1: Create a Kernel
+---
+
+## Step 1: Your first agent
+
+```typescript
+import { Kernel, Agent } from '@llmhut/agentvm';
+
+const kernel = new Kernel({ name: 'my-app' });
+
+const echo = new Agent({
+  name: 'echo',
+  description: 'Echoes its input back',
+  handler: async (ctx) => {
+    return `You said: ${ctx.input}`;
+  },
+});
+
+kernel.register(echo);
+const proc = await kernel.spawn('echo');
+const result = await kernel.execute(proc.id, { task: 'hello world' });
+
+console.log(result.output); // "You said: hello world"
+await kernel.terminate(proc.id);
+```
+
+---
+
+## Step 2: Using memory
+
+Agents get isolated working memory per process. Memory persists across multiple `execute()` calls on the same process.
+
+```typescript
+const counter = new Agent({
+  name: 'counter',
+  handler: async (ctx) => {
+    const n = ((await ctx.memory.get('count')) as number ?? 0) + 1;
+    await ctx.memory.set('count', n);
+    return n;
+  },
+});
+
+kernel.register(counter);
+const proc = await kernel.spawn('counter');
+
+console.log((await kernel.execute(proc.id, { task: 'inc' })).output); // 1
+console.log((await kernel.execute(proc.id, { task: 'inc' })).output); // 2
+console.log((await kernel.execute(proc.id, { task: 'inc' })).output); // 3
+```
+
+For cross-agent shared state, use `kernel.memory.getSharedAccessor()`.
+
+---
+
+## Step 3: Registering and using tools
+
+```typescript
+import { Kernel, Agent } from '@llmhut/agentvm';
+
+const kernel = new Kernel();
+
+kernel.registerTool({
+  name: 'reverse',
+  description: 'Reverses a string',
+  parameters: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+  sideEffects: 'none',
+  permission: 'public',
+  handler: async (params) => {
+    const { text } = params as { text: string };
+    return text.split('').reverse().join('');
+  },
+});
+
+const agent = new Agent({
+  name: 'reverser',
+  tools: ['reverse'], // declare which tools this agent can use
+  handler: async (ctx) => {
+    return ctx.useTool('reverse', { text: ctx.input });
+  },
+});
+
+kernel.register(agent);
+const proc = await kernel.spawn('reverser');
+const result = await kernel.execute(proc.id, { task: 'hello' });
+console.log(result.output); // "olleh"
+```
+
+Or use the built-in tools that ship with AgentVM:
+
+```typescript
+import { registerBuiltins } from '@llmhut/agentvm';
+
+registerBuiltins(kernel); // registers http_fetch, json_fetch, shell_exec, file_read, file_write, wait
+```
+
+---
+
+## Step 4: LLM agents
+
+Use `createLLMAgent()` to create agents powered by Anthropic or OpenAI models. The agent automatically runs a tool-use loop.
 
 ```typescript
 import { Kernel } from '@llmhut/agentvm';
+import { createLLMAgent } from '@llmhut/agentvm/llm'; // or '@llmhut/agentvm' (re-exported)
+import { httpFetchTool } from '@llmhut/agentvm';
 
-const kernel = new Kernel({
-  name: 'my-app',
-  debug: true,  // Logs all events to console
-});
-```
+const kernel = new Kernel();
+kernel.registerTool(httpFetchTool);
 
-## Step 2: Define an Agent
-
-```typescript
-import { Agent } from '@llmhut/agentvm';
-
-const researcher = new Agent({
+const researcher = createLLMAgent({
   name: 'researcher',
-  description: 'Researches topics and returns findings',
-  tools: ['web_search'],
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  systemPrompt: 'You are a research assistant. Use http_fetch to gather information.',
+  tools: ['http_fetch'],
+  maxTurns: 10,
 });
-```
 
-## Step 3: Register and Spawn
-
-```typescript
-// Register the agent definition
 kernel.register(researcher);
+const proc = await kernel.spawn('researcher');
 
-// Spawn a running process
-const process = await kernel.spawn('researcher');
-console.log(process.state); // 'running'
-console.log(process.id);    // 'researcher-1-m1abc2'
+// ANTHROPIC_API_KEY must be set in your environment
+const result = await kernel.execute(proc.id, {
+  task: 'What is the current price of Bitcoin?',
+});
+
+console.log(result.output);
+await kernel.shutdown();
 ```
 
-## Step 4: Manage the Lifecycle
+For OpenAI, swap `provider: 'openai'` and set `OPENAI_API_KEY`.
+
+---
+
+## Step 5: MCP tools
+
+Connect to any MCP server (stdio or SSE) and its tools automatically become available in the `ToolRouter`.
 
 ```typescript
-// Pause
-await kernel.pause(process.id);
-console.log(process.state); // 'paused'
+import { Kernel, MCPClient } from '@llmhut/agentvm';
+import { createLLMAgent } from '@llmhut/agentvm';
 
-// Resume
-await kernel.resume(process.id);
-console.log(process.state); // 'running'
+const kernel = new Kernel();
+const mcp = new MCPClient(kernel);
 
-// Terminate
-await kernel.terminate(process.id);
-console.log(process.state); // 'terminated'
+// Connect to a stdio MCP server — tools auto-register as mcp:<name>:<tool>
+const tools = await mcp.connect({
+  name: 'filesystem',
+  transport: 'stdio',
+  command: 'npx',
+  args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp'],
+});
+
+console.log(tools.map(t => `mcp:filesystem:${t.name}`));
+// ["mcp:filesystem:read_file", "mcp:filesystem:write_file", ...]
+
+const agent = createLLMAgent({
+  name: 'file-agent',
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514',
+  systemPrompt: 'You are a file management assistant.',
+  tools: ['mcp:filesystem:read_file', 'mcp:filesystem:write_file'],
+});
+
+kernel.register(agent);
+const proc = await kernel.spawn('file-agent');
+await kernel.execute(proc.id, { task: 'Create a file at /tmp/hello.txt saying Hello World' });
+
+await mcp.disconnectAll();
+await kernel.shutdown();
 ```
 
-## Step 5: Listen to Events
+---
+
+## Step 6: Multi-agent pipelines
 
 ```typescript
+import { Kernel } from '@llmhut/agentvm';
+import { createLLMAgent, createPipeline } from '@llmhut/agentvm';
+
 const kernel = new Kernel();
 
-// Listen to specific events
-kernel.on('process:spawned', (event) => {
-  console.log(`New process: ${event.data.id}`);
+const researcher = createLLMAgent({ name: 'researcher', provider: 'anthropic', model: 'claude-sonnet-4-20250514', systemPrompt: 'Research the given topic thoroughly.', maxTurns: 5 });
+const writer = createLLMAgent({ name: 'writer', provider: 'anthropic', model: 'claude-sonnet-4-20250514', systemPrompt: 'Turn research findings into a polished article.', maxTurns: 2 });
+
+const run = await createPipeline(kernel, [researcher, writer]);
+const article = await run('The future of AI agents in 2026');
+console.log(article);
+```
+
+---
+
+## Step 7: Events and observability
+
+Every operation emits a structured event. Subscribe to observe everything the kernel does.
+
+```typescript
+// Listen to a specific event
+kernel.on('execution:completed', (event) => {
+  console.log(`Done in ${event.data.duration}ms`);
 });
 
 // Listen to ALL events
 kernel.onAny((event) => {
-  console.log(`[${event.type}]`, event.data);
+  console.log(`[${event.timestamp.toISOString()}] ${event.type}`, event.data);
 });
-```
 
-## Step 6: Use Memory
-
-```typescript
-import { MemoryBus } from '@llmhut/agentvm';
-
-const memoryBus = new MemoryBus();
-
-// Per-process isolated memory
-const mem = memoryBus.getAccessor(process.id);
-await mem.set('findings', ['result 1', 'result 2']);
-await mem.get('findings'); // ['result 1', 'result 2']
-
-// Cross-agent shared memory
-const shared = memoryBus.getSharedAccessor();
-await shared.set('config', { model: 'claude-sonnet' });
-```
-
-## Step 7: Register Tools
-
-```typescript
-import { ToolRouter } from '@llmhut/agentvm';
-
-const toolRouter = new ToolRouter();
-
-toolRouter.register({
-  name: 'web_search',
-  description: 'Search the web',
-  parameters: { type: 'object' },
-  sideEffects: 'read',
-  permission: 'public',
-  rateLimit: 10, // 10 calls per minute
-  handler: async (params) => {
-    // Your implementation here
-    return { results: ['...'] };
+// Or pass handlers at construction time
+const kernel = new Kernel({
+  debug: true, // logs all events to console.warn automatically
+  on: {
+    'process:crashed': (e) => alerts.send(`Process crashed: ${e.data.id}`),
   },
 });
 ```
 
-## Step 8: Agent Communication
+See [RFC-003](../rfcs/RFC-003-EVENT-SCHEMA.md) for the full event catalog and payload shapes.
+
+---
+
+## Step 8: Process lifecycle
 
 ```typescript
-import { MessageBroker } from '@llmhut/agentvm';
+const proc = await kernel.spawn('researcher');
 
-const broker = new MessageBroker();
+await kernel.pause(proc.id);
+console.log(proc.state);  // 'paused'
 
-// Create a channel
-broker.createChannel({ name: 'findings', type: 'pubsub' });
+await kernel.resume(proc.id);
+console.log(proc.state);  // 'running'
 
-// Subscribe
-broker.subscribe('findings', 'analyst-proc-1', (message) => {
-  console.log(`Got findings from ${message.from}:`, message.data);
-});
+await kernel.terminate(proc.id);
+console.log(proc.state);  // 'terminated'
 
-// Publish
-broker.publish('findings', 'researcher-proc-1', {
-  topic: 'AI Agents',
-  results: ['...'],
-});
+// Terminate all active processes
+await kernel.shutdown();
 ```
 
-## What's Next?
+---
 
-- Check out the [examples/](../examples/) directory for more patterns
-- Read the [Architecture Overview](../docs/architecture/OVERVIEW.md)
-- See the [Roadmap](../ROADMAP.md) for what's coming next
-- Join our Discord to connect with the community
+## What's next?
+
+- Browse the [examples/](../../examples/) directory for runnable scripts
+- Read the [Architecture Overview](../architecture/OVERVIEW.md) for the full system design
+- Check the [Roadmap](../../ROADMAP.md) for what's coming in v0.3.0
+- See [RFC-001](../rfcs/RFC-001-PROCESS-STATE-MACHINE.md), [RFC-002](../rfcs/RFC-002-MEMORY-BUS-INTERFACE.md), [RFC-003](../rfcs/RFC-003-EVENT-SCHEMA.md) for design decisions
