@@ -15,6 +15,7 @@
   ],
   "scripts": {
     "build": "tsup src/index.ts src/cli/index.ts --format esm --dts --clean",
+    "commit": "cz",
     "dev": "tsup src/index.ts src/cli/index.ts --format esm --dts --watch",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -27,6 +28,11 @@
     "prepare": "husky",
     "coverage:check": "vitest run --coverage && node scripts/check-coverage.js"
 
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
   },
   "lint-staged": {
     "src/**/*.ts": [

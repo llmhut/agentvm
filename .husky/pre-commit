@@ -1,8 +1,8 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
 echo "🔍 Running lint-staged..."
 npx lint-staged
+
+echo "🧠 Running format..."
+npm run format || exit 1
 
 echo "🧠 Running typecheck..."
 npm run typecheck || exit 1
