@@ -4,7 +4,7 @@ import { c, success, info, log, sym } from '../utils.js';
 
 export async function initCommand(
   name: string | undefined,
-  options: { template: string }
+  options: { template: string },
 ): Promise<void> {
   const projectName = name ?? 'my-agentvm-app';
   const projectDir = path.resolve(process.cwd(), projectName);
@@ -31,42 +31,61 @@ export async function initCommand(
   }
 
   // package.json
-  writeFile(projectDir, 'package.json', JSON.stringify({
-    name: projectName,
-    version: '0.1.0',
-    type: 'module',
-    private: true,
-    scripts: {
-      start: 'agentvm start',
-      dev: 'agentvm start --debug',
-      build: 'tsc',
-    },
-    dependencies: {
-      '@llmhut/agentvm': '^0.1.0',
-    },
-    devDependencies: {
-      typescript: '^5.5.0',
-      '@types/node': '^20.0.0',
-    },
-  }, null, 2));
+  writeFile(
+    projectDir,
+    'package.json',
+    JSON.stringify(
+      {
+        name: projectName,
+        version: '0.1.0',
+        type: 'module',
+        private: true,
+        scripts: {
+          start: 'agentvm start',
+          dev: 'agentvm start --debug',
+          build: 'tsc',
+        },
+        dependencies: {
+          '@llmhut/agentvm': '^0.1.0',
+        },
+        devDependencies: {
+          typescript: '^5.5.0',
+          '@types/node': '^20.0.0',
+        },
+      },
+      null,
+      2,
+    ),
+  );
 
   // tsconfig.json
-  writeFile(projectDir, 'tsconfig.json', JSON.stringify({
-    compilerOptions: {
-      target: 'ES2022',
-      module: 'ESNext',
-      moduleResolution: 'bundler',
-      strict: true,
-      esModuleInterop: true,
-      outDir: 'dist',
-      rootDir: 'src',
-      declaration: true,
-    },
-    include: ['src'],
-  }, null, 2));
+  writeFile(
+    projectDir,
+    'tsconfig.json',
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'ESNext',
+          moduleResolution: 'bundler',
+          strict: true,
+          esModuleInterop: true,
+          outDir: 'dist',
+          rootDir: 'src',
+          declaration: true,
+        },
+        include: ['src'],
+      },
+      null,
+      2,
+    ),
+  );
 
   // agentvm.config.ts
-  writeFile(projectDir, 'agentvm.config.ts', `import { Kernel, Agent } from '@llmhut/agentvm';
+  writeFile(
+    projectDir,
+    'agentvm.config.ts',
+    `import { Kernel, Agent } from '@llmhut/agentvm';
 
 /**
  * AgentVM Configuration
@@ -100,10 +119,14 @@ kernel.register(greeter);
 // ── Export the kernel ──
 
 export default kernel;
-`);
+`,
+  );
 
   // Example agent file
-  writeFile(projectDir, 'src/agents/researcher.ts', `import { Agent } from '@llmhut/agentvm';
+  writeFile(
+    projectDir,
+    'src/agents/researcher.ts',
+    `import { Agent } from '@llmhut/agentvm';
 
 /**
  * Researcher Agent
@@ -132,10 +155,14 @@ export const researcher = new Agent({
     };
   },
 });
-`);
+`,
+  );
 
   // Example tool file
-  writeFile(projectDir, 'src/tools/search.ts', `import type { ToolDefinition } from '@llmhut/agentvm';
+  writeFile(
+    projectDir,
+    'src/tools/search.ts',
+    `import type { ToolDefinition } from '@llmhut/agentvm';
 
 /**
  * Search Tool
@@ -166,14 +193,19 @@ export const searchTool: ToolDefinition = {
     };
   },
 };
-`);
+`,
+  );
 
   // .gitignore
-  writeFile(projectDir, '.gitignore', `node_modules/
+  writeFile(
+    projectDir,
+    '.gitignore',
+    `node_modules/
 dist/
 .env
 *.log
-`);
+`,
+  );
 
   // Summary
   log('');

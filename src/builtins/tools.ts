@@ -77,8 +77,7 @@ export const httpFetchTool: ToolDefinition = {
 export const jsonFetchTool: ToolDefinition = {
   name: 'json_fetch',
   description:
-    'Fetch a URL and parse the response as JSON. ' +
-    'Returns the parsed JSON object directly.',
+    'Fetch a URL and parse the response as JSON. ' + 'Returns the parsed JSON object directly.',
   parameters: {
     type: 'object',
     properties: {
@@ -102,7 +101,7 @@ export const jsonFetchTool: ToolDefinition = {
 
     const response = await fetch(p.url, {
       method: p.method ?? 'GET',
-      headers: { 'Accept': 'application/json', ...p.headers },
+      headers: { Accept: 'application/json', ...p.headers },
       body: p.body,
       signal: AbortSignal.timeout(30_000),
     });

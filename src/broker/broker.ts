@@ -68,7 +68,7 @@ export class MessageBroker {
   subscribe<T = unknown>(
     channelName: string,
     subscriberId: string,
-    handler: MessageHandler<T>
+    handler: MessageHandler<T>,
   ): () => void {
     const channel = this._channels.get(channelName);
     if (!channel) {
