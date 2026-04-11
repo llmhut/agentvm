@@ -1,28 +1,40 @@
-## What does this PR do?
+## Summary
 
-<!-- Brief description of the change -->
+<!-- What does this PR do? One or two sentences. -->
 
-## Why?
+## Type of change
 
-<!-- Link to issue: Closes #XX -->
+- [ ] 🐛 Bug fix (non-breaking)
+- [ ] 🚀 New feature (non-breaking)
+- [ ] 💥 Breaking change (fix or feature that changes existing behavior)
+- [ ] 📝 Documentation update
+- [ ] 🔧 Refactor / internal change
+- [ ] ⬆️ Dependency update
 
-## Type of Change
+## Related issues
 
-- [ ] 🐛 Bug fix
-- [ ] ✨ New feature
-- [ ] 📝 Documentation
-- [ ] ♻️ Refactor
-- [ ] 🧪 Tests
-- [ ] 🔧 CI/Build
+<!-- Closes #123 -->
+
+## Changes
+
+<!-- Bullet points of what changed and why -->
+
+-
+-
+
+## Testing
+
+<!-- How did you test this? -->
+
+- [ ] Added/updated unit tests
+- [ ] Manually tested locally
 
 ## Checklist
 
-- [ ] Tests added/updated
-- [ ] Docs updated (if API changed)
-- [ ] `npm run lint` passes
-- [ ] `npm test` passes
-- [ ] Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/)
+- [ ] My code follows the project's style (`npm run lint` passes)
+- [ ] I ran `npm run typecheck` with no errors
+- [ ] I ran `npm test` and all tests pass
+- [ ] I updated documentation if needed
+- [ ] This is a breaking change and I've noted it above
 
-## Screenshots / Examples
-
-<!-- If applicable, show before/after or usage examples -->
+<!-- For breaking changes, add a migration note below -->

@@ -8,9 +8,9 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
-[![npm version](https://img.shields.io/badge/npm-v0.1.0--alpha-orange)]()
-[![Discord](https://img.shields.io/badge/Discord-Join%20us-7289DA)]()
+[![npm version](https://img.shields.io/npm/v/@llmhut/agentvm)](https://www.npmjs.com/package/@llmhut/agentvm)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
+[![codecov](https://codecov.io/github/llmhut/agentvm/graph/badge.svg?token=GDNPA2LMQ3)](https://codecov.io/github/llmhut/agentvm)
 
 [Documentation](./docs) · [Quick Start](#quick-start) · [Roadmap](#roadmap) · [Contributing](CONTRIBUTING.md) · [Discord]()
 

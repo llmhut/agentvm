@@ -1,0 +1,56 @@
+# Maps changed file paths to PR labels
+# https://github.com/actions/labeler
+
+"module:core":
+  - changed-files:
+      - any-glob-to-any-file: "src/core/**"
+
+"module:memory":
+  - changed-files:
+      - any-glob-to-any-file: "src/memory/**"
+
+"module:tools":
+  - changed-files:
+      - any-glob-to-any-file: "src/tools/**"
+
+"module:broker":
+  - changed-files:
+      - any-glob-to-any-file: "src/broker/**"
+
+"module:scheduler":
+  - changed-files:
+      - any-glob-to-any-file: "src/scheduler/**"
+
+"module:cli":
+  - changed-files:
+      - any-glob-to-any-file: "src/cli/**"
+
+"documentation":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "*.md"
+          - ".github/**/*.md"
+
+"tests":
+  - changed-files:
+      - any-glob-to-any-file: "tests/**"
+
+"ci/cd":
+  - changed-files:
+      - any-glob-to-any-file: ".github/workflows/**"
+
+"dependencies":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "package.json"
+          - "package-lock.json"
+
+"configuration":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tsconfig.json"
+          - "vitest.config.ts"
+          - "eslint.config.js"
+          - ".prettierrc"
+          - ".editorconfig"
