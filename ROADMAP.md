@@ -11,7 +11,7 @@
 | Version | Codename | Target | Status |
 |---------|----------|--------|--------|
 | v0.1.0 | **Genesis** | Q2 2026 | ✅ Released |
-| v0.2.x | **Ignition** | Q2 2026 | ✅ Released (v0.2.2) |
+| v0.2.x | **Ignition** | Q2 2026 | ✅ Released (v0.2.3) |
 | v0.3.0 | **Bridge** | Q3 2026 | 🟢 In Progress |
 | v1.0.0 | **Launch** | Q1 2027 | ⬜ Planned |
 

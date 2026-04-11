@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet — v0.2.2 is the current release.
+Nothing yet — v0.2.3 is the current release.
 
 ---
 
