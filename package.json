@@ -1,6 +1,6 @@
 {
   "name": "@llmhut/agentvm",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "description": "The runtime your AI agents deserve. Process management, memory bus, tool routing, message passing, and scheduling for autonomous agents.",
   "main": "dist/index.js",
