@@ -44,7 +44,7 @@ Every AI agent framework reinvents the same infrastructure: process lifecycle, m
 
 ## Architecture
 
-<img src="./assets/svg/agentvm_architecture.svg" />
+<img src="./assets/svg/agentvm_architecture.png" width="100%" alt="AgentVM Architecture" />
 
 ### Core Modules
 
