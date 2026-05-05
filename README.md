@@ -63,6 +63,8 @@ Every AI agent framework reinvents the same infrastructure: process lifecycle, m
 
 **🧰 Built-in Tools** — Ships with `http_fetch`, `json_fetch`, `shell_exec`, `file_read`, `file_write`, and `wait` — register only what you need.
 
+**🔗 Framework Adapters** — Use AgentVM tools in any framework: LangChain.js, Vercel AI SDK, OpenAI, Anthropic, or expose them as an MCP server. Zero dependencies — just plain objects that match each framework's interface.
+
 ---
 
 ## Quick Start
@@ -210,6 +212,73 @@ const proc = await kernel.spawn('producer');
 await kernel.execute(proc.id, { task: 'LLM benchmarks show Claude leading' });
 ```
 
+### Use with LangChain.js
+
+```typescript
+import { Kernel, registerBuiltins, toLangChainTools, toLangChainMemory } from '@llmhut/agentvm';
+
+const kernel = new Kernel();
+registerBuiltins(kernel);
+
+// Convert AgentVM tools → LangChain DynamicStructuredTool format
+const tools = toLangChainTools(kernel, ['http_fetch', 'json_fetch']);
+
+// Use AgentVM memory as LangChain memory (backed by SQLite, etc.)
+const memory = toLangChainMemory(kernel, 'session-1', {
+  memoryKey: 'chat_history',
+  maxEntries: 50,
+});
+
+// Pass to any LangChain agent
+// const executor = new AgentExecutor({ agent, tools, memory });
+```
+
+### Use with Vercel AI SDK
+
+```typescript
+import { Kernel, registerBuiltins, toAISDKTools } from '@llmhut/agentvm';
+import { generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+
+const kernel = new Kernel();
+registerBuiltins(kernel);
+
+const result = await generateText({
+  model: openai('gpt-4o'),
+  prompt: 'Fetch https://example.com and summarize it',
+  tools: toAISDKTools(kernel, ['http_fetch']),
+});
+```
+
+### Use with OpenAI / Anthropic Directly
+
+```typescript
+import { Kernel, registerBuiltins, toOpenAITools, toAnthropicTools, createToolExecutor } from '@llmhut/agentvm';
+
+const kernel = new Kernel();
+registerBuiltins(kernel);
+
+// Get tools in the format each API expects
+const openaiTools = toOpenAITools(kernel);       // for OpenAI function calling
+const anthropicTools = toAnthropicTools(kernel);  // for Anthropic tool use
+
+// Execute tool calls from any model response
+const executor = createToolExecutor(kernel);
+const result = await executor('http_fetch', { url: 'https://example.com' });
+```
+
+### Expose as MCP Server
+
+```typescript
+import { Kernel, registerBuiltins, serveMCP } from '@llmhut/agentvm';
+
+const kernel = new Kernel();
+registerBuiltins(kernel);
+
+// Claude Desktop, Cursor, or any MCP client can now use your tools
+serveMCP(kernel);
+```
+
 ---
 
 ## Roadmap
@@ -242,7 +311,8 @@ We're building in public. Here's where we're headed:
 - [x] YAML config system with env overrides
 - [x] Process checkpointing (save/restore)
 - [x] Resource tracking (`Kernel.stats()`, `tokensUsed`)
-- [x] 299 unit tests
+- [x] Framework adapters (LangChain.js, Vercel AI SDK, OpenAI, Anthropic, MCP Server)
+- [x] 333 unit tests
 
 ### 🟡 Phase 4 — Launch (v1.0.0) `← NEXT`
 
@@ -290,11 +360,15 @@ agentvm/
 │   │   └── client.ts      # Stdio + SSE MCP client
 │   ├── builtins/          # Built-in tools
 │   │   └── tools.ts       # http_fetch, shell_exec, file I/O, wait
+│   ├── adapters/          # Framework adapters
+│   │   ├── langchain.ts   # LangChain.js tools + memory
+│   │   ├── vercel-ai.ts   # Vercel AI SDK tools + usage tracking
+│   │   └── generic.ts     # OpenAI, Anthropic, MCP server, tool executor
 │   ├── cli/               # CLI interface
 │   │   ├── index.ts       # CLI entry point
 │   │   └── commands/      # init, start, ps, kill, logs
 │   └── index.ts           # Public API exports
-├── tests/unit/            # 299 unit tests
+├── tests/unit/            # 333 unit tests
 ├── examples/              # Working examples
 ├── docs/                  # Architecture docs, guides, RFCs
 └── package.json

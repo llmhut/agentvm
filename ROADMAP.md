@@ -125,10 +125,13 @@
 - [ ] Automatic checkpoint on crash
 - [ ] RFC-005 (Checkpointing Strategy) — planned
 
-#### M3.6 — Framework Adapters
-- [ ] LangChain adapter — use `AgentVM` as LangChain's memory and tool runtime
-- [ ] CrewAI adapter — map CrewAI agents to AgentVM processes
-- [ ] Adapter test suites and migration guides
+#### M3.6 — Framework Adapters ✅
+- [x] LangChain.js adapter — tools (`toLangChainTools`) + memory (`toLangChainMemory`)
+- [x] Vercel AI SDK adapter — tools (`toAISDKTools`) + usage tracking (`createUsageTracker`)
+- [x] Generic adapter — OpenAI format, Anthropic format, tool executor, MCP server (`serveMCP`)
+- [x] `describeTools()` debug helper
+- [x] Adapter test suite (34 tests)
+- [ ] CrewAI adapter (Python-only framework — out of scope for JS SDK)
 
 ### Phase 3 RFCs
 - `RFC-004` — Agent Contract Enforcement
@@ -210,6 +213,7 @@ We use GitHub Discussions for feature requests. The community votes on what gets
 | 2026-04-05 | v0.2.1 released | AgentContract types, convenience methods, bug fixes |
 | 2026-04-11 | v0.2.2 released | MCPClient, createLLMAgent, built-in tools, pipeline helper |
 | 2026-05-05 | v0.3.0 released | MemoryBackend interface, SQLite backend, contract enforcement, config system, checkpointing, Kernel.stats() |
+| 2026-05-05 | Framework adapters | LangChain.js, Vercel AI SDK, and generic (OpenAI/Anthropic/MCP) adapters shipped |
 
 > This log is updated with every major decision. Subscribe to releases to get notified.
 

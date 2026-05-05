@@ -72,6 +72,21 @@ export {
 // LLM Agent
 export { createLLMAgent, createPipeline } from './llm/agent';
 
+// Adapters — LangChain
+export { toolToLangChain, toLangChainTools, toLangChainMemory } from './adapters/langchain';
+
+// Adapters — Vercel AI SDK
+export { toolToAISDK, toAISDKTools, createUsageTracker } from './adapters/vercel-ai';
+
+// Adapters — Generic (OpenAI, Anthropic, MCP Server)
+export {
+  toOpenAITools,
+  toAnthropicTools,
+  createToolExecutor,
+  serveMCP,
+  describeTools,
+} from './adapters/generic';
+
 // Types
 export type {
   // Core
@@ -127,3 +142,8 @@ export type { AgentVMConfig, AgentYamlConfig, ChannelYamlConfig } from './config
 
 // Checkpoint Types
 export type { CheckpointData } from './checkpoint/checkpoint';
+
+// Adapter Types
+export type { LangChainToolShape, LangChainMemoryShape } from './adapters/langchain';
+export type { AISDKToolShape } from './adapters/vercel-ai';
+export type { OpenAIToolShape, AnthropicToolShape } from './adapters/generic';

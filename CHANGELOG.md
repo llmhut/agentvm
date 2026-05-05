@@ -14,6 +14,25 @@ Nothing yet — v0.3.0 is the current release.
 ## [0.3.0] — 2026-05-05
 
 ### Added
+- **Framework Adapters** (`src/adapters/`)
+  - **LangChain.js adapter** (`adapters/langchain.ts`)
+    - `toolToLangChain(tool)` — convert a single AgentVM tool to LangChain `DynamicStructuredTool` shape
+    - `toLangChainTools(kernel, filter?)` — convert all (or filtered) tools at once
+    - `toLangChainMemory(kernel, namespace, options?)` — use AgentVM memory as LangChain `BaseMemory`
+      - Supports `memoryKey`, `maxEntries`, `returnFormat` ('string' | 'array')
+      - `loadMemoryVariables()`, `saveContext()`, `clear()` interface
+  - **Vercel AI SDK adapter** (`adapters/vercel-ai.ts`)
+    - `toolToAISDK(tool)` — convert a single tool to AI SDK `tool()` format
+    - `toAISDKTools(kernel, filter?)` — returns `Record<string, tool>` for `generateText({ tools })`
+    - `createUsageTracker(kernel, namespace)` — record AI SDK token usage into AgentVM memory
+  - **Generic adapter** (`adapters/generic.ts`)
+    - `toOpenAITools(kernel)` — OpenAI function-calling format (works with LiteLLM, Ollama, etc.)
+    - `toAnthropicTools(kernel)` — Anthropic tool format (`name`, `description`, `input_schema`)
+    - `createToolExecutor(kernel)` — generic `(toolName, args) => result` for any model response
+    - `serveMCP(kernel)` — expose AgentVM tools as an MCP server over stdio (for Claude Desktop, Cursor, etc.)
+    - `describeTools(kernel)` — human-readable tool summary for debugging
+  - All adapters are zero-dependency — they produce plain objects matching each framework's interface
+  - 34 adapter tests covering all conversion formats and integration with built-in tools
 - **Pluggable Memory Backends**
   - `MemoryBackend` interface — 8-method contract (`get`, `set`, `delete`, `list`, `clear`, `deleteNamespace`, `stats`, `close`)
   - `InMemoryBackend` — refactored default backend, fully backward compatible
@@ -45,7 +64,7 @@ Nothing yet — v0.3.0 is the current release.
 - `ProcessOptions.tokenBudget` — type added for per-process token limits
 - `KernelConfig.memoryBackend` — pass a `MemoryBackend` instance to the kernel constructor
 - New type exports: `MemoryBackend`, `MemoryBackendStats`, `AgentVMConfig`, `CheckpointData`, `KernelStats`
-- 80 new unit tests (299 total across 8 test files)
+- 114 new unit tests (333 total across 9 test files)
 
 ### Changed
 - `MemoryBus` — rewritten to use `MemoryBackend` interface internally (backward compatible API)
