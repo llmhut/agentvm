@@ -1,6 +1,7 @@
 <div align="center">
-
-# 🔩 AgentVM
+<p align="center">
+  <img src="/docs/agentvm-banner.png" width="300px" alt="AgentVM Banner" />
+</p>
 
 ### The Runtime Your AI Agents Deserve
 
@@ -278,6 +279,16 @@ registerBuiltins(kernel);
 // Claude Desktop, Cursor, or any MCP client can now use your tools
 serveMCP(kernel);
 ```
+
+---
+
+## Integration Guides
+
+Detailed guides for using AgentVM with popular frameworks:
+
+- **[LangChain.js](./docs/integrations/langchain.md)** — Tools + persistent memory for LangChain agents
+- **[Vercel AI SDK](./docs/integrations/vercel-ai-sdk.md)** — Tools for `generateText()` / `streamText()` + token tracking
+- **[OpenAI / Anthropic / MCP](./docs/integrations/generic.md)** — Direct API integration, tool executor, and MCP server
 
 ---
 

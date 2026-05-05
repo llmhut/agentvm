@@ -31,7 +31,7 @@
  */
 
 import { Agent } from '../core/agent';
-import type { AgentConfig, ExecutionContext } from '../core/types';
+import type { AgentConfig, AgentContract, ExecutionContext } from '../core/types';
 
 // ──────────────────────────────────────────────
 // Types
@@ -52,6 +52,8 @@ export interface LLMAgentConfig {
   tools?: string[];
   /** Memory configuration */
   memory?: { persistent?: boolean };
+  /** Agent contract for input/output validation and SLA */
+  contract?: AgentContract;
   /** Maximum agentic loop turns (default: 10) */
   maxTurns?: number;
   /** Maximum tokens per response (default: 4096) */
@@ -124,6 +126,7 @@ export function createLLMAgent(config: LLMAgentConfig): Agent {
     description: config.description ?? `LLM agent using ${config.provider}/${config.model}`,
     tools: config.tools,
     memory: config.memory,
+    contract: config.contract,
     handler: async (ctx: ExecutionContext) => {
       // Load conversation history from memory (for multi-turn)
       const history = ((await ctx.memory.get('__llm_messages')) as LLMMessage[] | undefined) ?? [];
