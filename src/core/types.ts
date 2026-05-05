@@ -37,6 +37,8 @@ export interface ProcessOptions {
   timeout?: number;
   /** Maximum memory usage in bytes */
   memoryLimit?: number;
+  /** Maximum total tokens this process can consume */
+  tokenBudget?: number;
 }
 
 // ──────────────────────────────────────────────
@@ -247,8 +249,8 @@ export type EventHandler = (event: KernelEvent) => void | Promise<void>;
 export interface KernelConfig {
   /** Kernel instance name */
   name?: string;
-  /** Default memory backend */
-  memoryBackend?: 'memory' | 'sqlite' | 'redis' | 'postgres';
+  /** Default memory backend (string name for built-in, or a MemoryBackend instance) */
+  memoryBackend?: 'memory' | 'sqlite' | 'redis' | 'postgres' | unknown;
   /** Maximum concurrent processes */
   maxProcesses?: number;
   /** Enable debug logging */

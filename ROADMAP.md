@@ -2,7 +2,7 @@
 
 > **Building in public.** Every milestone, every decision, every trade-off — documented here.
 >
-> Last updated: April 2026
+> Last updated: May 2026
 
 ---
 
@@ -12,7 +12,7 @@
 |---------|----------|--------|--------|
 | v0.1.0 | **Genesis** | Q2 2026 | ✅ Released |
 | v0.2.x | **Ignition** | Q2 2026 | ✅ Released (v0.2.3) |
-| v0.3.0 | **Bridge** | Q3 2026 | 🟢 In Progress |
+| v0.3.0 | **Bridge** | Q3 2026 | ✅ Released |
 | v1.0.0 | **Launch** | Q1 2027 | ⬜ Planned |
 
 ---
@@ -77,7 +77,7 @@
 
 ---
 
-## Phase 3 — Bridge (v0.3.0)
+## Phase 3 — Bridge (v0.3.0) ✅
 
 **Goal:** Persistent state, runtime contract enforcement, config system, and framework adapters.
 
@@ -85,36 +85,43 @@
 
 ### Milestones
 
-#### M3.1 — Config System
-- [ ] YAML config file (`agentvm.yml`) — declare agents, tools, channels declaratively
-- [ ] Environment variable overrides for all config fields
-- [ ] Config validation on startup with helpful error messages
+#### M3.1 — Config System ✅
+- [x] YAML config file (`agentvm.yml`) — declare agents, tools, channels declaratively
+- [x] Built-in YAML parser (zero dependencies)
+- [x] Environment variable overrides via `env:` section
+- [x] Config validation on startup with helpful error messages (`ConfigValidationError`)
 - [ ] Hot-reload for non-breaking config changes
 - [ ] `agentvm validate` CLI command
 
-#### M3.2 — Persistent Memory Backends
-- [ ] `MemoryBackend` interface — stable contract all backends implement
-- [ ] SQLite backend — embedded, zero-config, file-based persistence
+#### M3.2 — Persistent Memory Backends ✅
+- [x] `MemoryBackend` interface — stable contract all backends implement (8 methods)
+- [x] `InMemoryBackend` — refactored default, backward compatible
+- [x] `SqliteBackend` — embedded, zero-config, file-based persistence via sql.js (pure WASM)
+- [x] `MemoryBus` accepts pluggable backends via constructor
+- [x] `Kernel` accepts `memoryBackend` in config
 - [ ] Redis backend — distributed cache + pub/sub, connection pooling
-- [ ] Backend selection via `memory: { backend: 'sqlite' }` in `AgentConfig`
 - [ ] Migration utility — move memory data between backends
 
-#### M3.3 — Agent Contract Enforcement
-- [ ] Runtime input validation against `AgentContract.input` schema
-- [ ] Runtime output validation against `AgentContract.output` schema
+#### M3.3 — Agent Contract Enforcement ✅
+- [x] Runtime input validation against `AgentContract.input` schema
+- [x] Runtime output validation against `AgentContract.output` schema
+- [x] `validateSchema()` — recursive validator for string/number/boolean/object/array
+- [x] `ContractValidationError` with agent name, phase, and violation details
+- [x] SLA enforcement — emits `contract:sla:latency` event when `maxLatency` exceeded
 - [ ] `Pipeline` validates type compatibility between chained agents at construction time
-- [ ] SLA enforcement — timeout processes that exceed `maxLatency`, warn on `maxCost`
 - [ ] RFC-004 (Agent Contract Enforcement) — in progress
 
-#### M3.4 — Resource Tracking
-- [ ] Surface `tokensUsed` and `cost` on `ExecutionResult` (currently always `undefined`)
-- [ ] LLM agent propagates `__llm_usage` to `ExecutionResult` automatically
+#### M3.4 — Resource Tracking ✅
+- [x] Surface `tokensUsed` on `ExecutionResult` automatically from `__llm_usage`
+- [x] LLM agent propagates `__llm_usage` to `ExecutionResult` automatically
+- [x] `Kernel.stats()` — aggregate stats: agents, processes by state, memory, tools, channels, total tokens
 - [ ] Per-process token budget — abort execution when limit exceeded
-- [ ] `Kernel.stats()` — aggregate resource usage across all processes
+- [ ] Surface `cost` on `ExecutionResult`
 
-#### M3.5 — Checkpointing
-- [ ] `Process.checkpoint()` — serialize process state to disk
-- [ ] `Kernel.restore(checkpointPath)` — restart process from checkpoint
+#### M3.5 — Checkpointing ✅
+- [x] `checkpoint(kernel, processId, path)` — serialize process metadata + memory to JSON
+- [x] `restore(kernel, path)` — spawn process and restore all memory from checkpoint
+- [x] `readCheckpoint(path)` — inspect checkpoint data without restoring
 - [ ] Automatic checkpoint on crash
 - [ ] RFC-005 (Checkpointing Strategy) — planned
 
@@ -202,6 +209,7 @@ We use GitHub Discussions for feature requests. The community votes on what gets
 | 2026-03-31 | v0.2.0 released | ToolRouter, MessageBroker, Scheduler, Kernel.execute() |
 | 2026-04-05 | v0.2.1 released | AgentContract types, convenience methods, bug fixes |
 | 2026-04-11 | v0.2.2 released | MCPClient, createLLMAgent, built-in tools, pipeline helper |
+| 2026-05-05 | v0.3.0 released | MemoryBackend interface, SQLite backend, contract enforcement, config system, checkpointing, Kernel.stats() |
 
 > This log is updated with every major decision. Subscribe to releases to get notified.
 

@@ -7,7 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet — v0.2.3 is the current release.
+Nothing yet — v0.3.0 is the current release.
+
+---
+
+## [0.3.0] — 2026-05-05
+
+### Added
+- **Pluggable Memory Backends**
+  - `MemoryBackend` interface — 8-method contract (`get`, `set`, `delete`, `list`, `clear`, `deleteNamespace`, `stats`, `close`)
+  - `InMemoryBackend` — refactored default backend, fully backward compatible
+  - `SqliteBackend` — file-based persistence using sql.js (pure WASM, no native bindings)
+    - `SqliteBackend.create('./data.db')` — async factory, loads existing DB or creates new
+    - Auto-flush dirty writes to disk every 5 seconds
+    - `flush()` for manual persistence, `close()` for graceful shutdown
+  - `MemoryBus` now accepts any `MemoryBackend` via constructor
+  - `MemoryBus.statsAsync()` — full async stats from the backend
+  - `MemoryBus.close()` — flush and release backend resources
+- **Agent Contract Enforcement**
+  - `validateSchema()` — recursive schema validator for `string`, `number`, `boolean`, `object`, `array` with nested `properties`, `required`, and `items`
+  - `validateInput()` / `validateOutput()` — called automatically in `Kernel.execute()` when agent has a `contract`
+  - `ContractValidationError` — thrown with agent name, phase (`input`/`output`), and violation details
+  - SLA enforcement — `Kernel.execute()` emits `contract:sla:latency` event when execution exceeds `contract.maxLatency`
+- **YAML Config System**
+  - `loadConfig('agentvm.yml')` — parse, validate, and return typed `AgentVMConfig`
+  - Built-in YAML parser (zero dependencies) — handles nested objects, arrays (block + flow), scalars, comments
+  - `validateConfig()` — checks types, required fields, valid enums; returns array of error messages
+  - `ConfigValidationError` with all violations listed
+  - Environment variable overrides via `env:` section in YAML
+- **Checkpointing**
+  - `checkpoint(kernel, processId, path)` — serialize process metadata + full memory snapshot to JSON
+  - `restore(kernel, path)` — spawn a new process and restore all memory from checkpoint file
+  - `readCheckpoint(path)` — inspect checkpoint data without restoring
+- **Resource Tracking & Kernel Stats**
+  - `ExecutionResult.tokensUsed` — automatically populated from `__llm_usage` in process memory
+  - `Kernel.stats()` — aggregate stats: agents, processes by state, memory backend info, tools, channels, total tokens
+- `ProcessOptions.tokenBudget` — type added for per-process token limits
+- `KernelConfig.memoryBackend` — pass a `MemoryBackend` instance to the kernel constructor
+- New type exports: `MemoryBackend`, `MemoryBackendStats`, `AgentVMConfig`, `CheckpointData`, `KernelStats`
+- 80 new unit tests (299 total across 8 test files)
+
+### Changed
+- `MemoryBus` — rewritten to use `MemoryBackend` interface internally (backward compatible API)
+- `Kernel` constructor — accepts `memoryBackend` in config, passes it to `MemoryBus`
+- `Kernel.execute()` — now validates input/output contracts, tracks resource usage, checks SLA latency
+- `src/index.ts` — exports config, checkpoint, and all new backend modules
+
+### Dependencies
+- Added `sql.js` (pure WASM SQLite) as optional dependency for `SqliteBackend`
 
 ---
 
@@ -130,7 +177,8 @@ Nothing yet — v0.2.3 is the current release.
 - 3 example projects: `hello-world.ts`, `multi-agent.ts`, `memory-demo.ts`
 - MIT License, Code of Conduct, Contributing guide
 
-[Unreleased]: https://github.com/llmhut/agentvm/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/llmhut/agentvm/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/llmhut/agentvm/compare/v0.2.3...v0.3.0
 [0.2.2]: https://github.com/llmhut/agentvm/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/llmhut/agentvm/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/llmhut/agentvm/compare/v0.1.0...v0.2.0

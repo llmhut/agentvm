@@ -17,11 +17,28 @@
 
 // Core
 export { Kernel } from './core/kernel';
+export type { KernelStats } from './core/kernel';
 export { Agent } from './core/agent';
 export { Process } from './core/process';
 
 // Memory
 export { MemoryBus } from './memory/bus';
+export { InMemoryBackend } from './memory/backends/memory';
+export { SqliteBackend } from './memory/backends/sqlite';
+
+// Contracts
+export {
+  validateSchema,
+  validateInput,
+  validateOutput,
+  ContractValidationError,
+} from './core/contracts';
+
+// Config
+export { loadConfig, parseYaml, validateConfig, ConfigValidationError } from './config/loader';
+
+// Checkpointing
+export { checkpoint, restore, readCheckpoint } from './checkpoint/checkpoint';
 
 // Tools
 export {
@@ -101,3 +118,12 @@ export type { MCPServerConfig, MCPTool, MCPResource } from './mcp/client';
 
 // LLM Types
 export type { LLMAgentConfig, LLMMessage, LLMResponse } from './llm/agent';
+
+// Memory Backend Types
+export type { MemoryBackend, MemoryBackendStats } from './memory/backend';
+
+// Config Types
+export type { AgentVMConfig, AgentYamlConfig, ChannelYamlConfig } from './config/loader';
+
+// Checkpoint Types
+export type { CheckpointData } from './checkpoint/checkpoint';

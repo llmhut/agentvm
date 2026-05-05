@@ -3,6 +3,7 @@ import { Process } from './process';
 import { MemoryBus } from '../memory/bus';
 import { ToolRouter } from '../tools/router';
 import { MessageBroker } from '../broker/broker';
+import { validateInput, validateOutput } from './contracts';
 import type {
   KernelConfig,
   ProcessOptions,
@@ -15,6 +16,7 @@ import type {
   ToolDefinition,
   ChannelConfig,
 } from './types';
+import type { MemoryBackend } from '../memory/backend';
 
 /**
  * Kernel — The AgentVM runtime.
@@ -65,7 +67,7 @@ export class Kernel {
     this._config = config;
     this._processCounter = 0;
 
-    this.memory = new MemoryBus();
+    this.memory = new MemoryBus(config.memoryBackend as MemoryBackend | undefined);
     this.tools = new ToolRouter();
     this.broker = new MessageBroker();
 
@@ -197,6 +199,11 @@ export class Kernel {
       );
     }
 
+    // ── Contract: validate input ──
+    if (agent.contract) {
+      validateInput(agent.name, agent.contract, taskInput.input ?? taskInput.task);
+    }
+
     const context = this._buildContext(process, agent, taskInput);
 
     const startTime = Date.now();
@@ -210,11 +217,42 @@ export class Kernel {
       const output = await agent.handler(context);
       const duration = Date.now() - startTime;
 
+      // ── Contract: validate output ──
+      if (agent.contract) {
+        validateOutput(agent.name, agent.contract, output);
+      }
+
+      // ── Resource tracking: surface LLM usage ──
+      let tokensUsed: number | undefined;
+      let cost: number | undefined;
+      try {
+        const usage = (await this.memory.getAccessor(process.id).get('__llm_usage')) as
+          | { inputTokens?: number; outputTokens?: number }
+          | undefined;
+        if (usage) {
+          tokensUsed = (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
+        }
+      } catch {
+        // Memory read failed — non-critical
+      }
+
+      // ── Contract: SLA check ──
+      if (agent.contract?.maxLatency && duration > agent.contract.maxLatency) {
+        this._emit('contract:sla:latency', {
+          processId,
+          agentName: agent.name,
+          maxLatency: agent.contract.maxLatency,
+          actualLatency: duration,
+        });
+      }
+
       const result: ExecutionResult = {
         processId: process.id,
         agentName: agent.name,
         output,
         duration,
+        tokensUsed,
+        cost,
         events: [...process.events],
       };
 
@@ -420,6 +458,60 @@ export class Kernel {
   }
 
   // ──────────────────────────────────────────────
+  // Stats
+  // ──────────────────────────────────────────────
+
+  /**
+   * Aggregate stats across all processes, memory, tools, broker.
+   */
+  async stats(): Promise<KernelStats> {
+    const processes = Array.from(this._processes.values());
+    const active = processes.filter(
+      (p) => p.state === ('running' as ProcessState) || p.state === ('paused' as ProcessState),
+    );
+
+    // Collect token usage from all processes
+    let totalTokens = 0;
+    for (const proc of processes) {
+      try {
+        const usage = (await this.memory.getAccessor(proc.id).get('__llm_usage')) as
+          | { inputTokens?: number; outputTokens?: number }
+          | undefined;
+        if (usage) {
+          totalTokens += (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
+        }
+      } catch {
+        // skip
+      }
+    }
+
+    const memStats = await this.memory.statsAsync();
+
+    return {
+      kernel: this.name,
+      agents: this._agents.size,
+      processes: {
+        total: processes.length,
+        active: active.length,
+        byState: {
+          running: processes.filter((p) => p.state === ('running' as ProcessState)).length,
+          paused: processes.filter((p) => p.state === ('paused' as ProcessState)).length,
+          terminated: processes.filter((p) => p.state === ('terminated' as ProcessState)).length,
+          crashed: processes.filter((p) => p.state === ('crashed' as ProcessState)).length,
+        },
+      },
+      memory: {
+        backend: memStats.backend,
+        namespaces: memStats.namespaces,
+        totalEntries: memStats.totalEntries,
+      },
+      tools: this.tools.tools.length,
+      channels: this.broker.stats.channels,
+      tokens: totalTokens,
+    };
+  }
+
+  // ──────────────────────────────────────────────
   // Internal Helpers
   // ──────────────────────────────────────────────
 
@@ -439,4 +531,23 @@ export class Kernel {
   toString(): string {
     return `Kernel(${this.name}, agents=${this._agents.size}, processes=${this._processes.size})`;
   }
+}
+
+/** Aggregate kernel statistics */
+export interface KernelStats {
+  kernel: string;
+  agents: number;
+  processes: {
+    total: number;
+    active: number;
+    byState: Record<string, number>;
+  };
+  memory: {
+    backend: string;
+    namespaces: number;
+    totalEntries: number;
+  };
+  tools: number;
+  channels: number;
+  tokens: number;
 }

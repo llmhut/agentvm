@@ -224,38 +224,33 @@ We're building in public. Here's where we're headed:
 - [x] Basic CLI (`agentvm start`, `agentvm ps`, `agentvm kill`)
 - [x] TypeScript SDK with full type safety
 - [x] Core event system
+
+### ✅ Phase 2 — Core Engine (v0.2.x) `COMPLETE`
+
 - [x] Tool router with permission model
 - [x] Message broker (pub/sub + direct channels)
 - [x] Event-driven scheduler with dependency resolution
-- [x] 163 unit tests
-
-### 🟢 Phase 2 — Core Engine (v0.2.x) `← WE ARE HERE`
-
 - [x] LLM Agent factory (Anthropic + OpenAI with tool loops)
 - [x] MCP client (stdio + SSE transports)
 - [x] Built-in tools (http_fetch, shell_exec, file I/O, wait)
 - [x] Multi-agent pipelines
-- [x] Tool schema injection at spawn time
-- [ ] Pluggable memory backends (SQLite, Redis)
-- [ ] Agent contracts with runtime validation
-- [ ] Configuration system (YAML + env vars)
 
-### 🟡 Phase 3 — Ecosystem (v0.3.x)
+### ✅ Phase 3 — Bridge (v0.3.0) `COMPLETE`
 
-- [ ] LangChain adapter plugin
-- [ ] CrewAI adapter plugin
-- [ ] Resource monitoring and limits (tokens, time, cost)
-- [ ] Crash recovery and checkpointing
-- [ ] Docker-based tool sandboxing
-- [ ] Python SDK
+- [x] Pluggable memory backends (InMemory + SQLite)
+- [x] Agent contracts with runtime input/output validation
+- [x] YAML config system with env overrides
+- [x] Process checkpointing (save/restore)
+- [x] Resource tracking (`Kernel.stats()`, `tokensUsed`)
+- [x] 299 unit tests
 
-### 🟠 Phase 4 — Production (v1.0)
+### 🟡 Phase 4 — Launch (v1.0.0) `← NEXT`
 
 - [ ] Distributed mode (multi-node agent clusters)
 - [ ] Kubernetes operator
 - [ ] Admin dashboard web UI
 - [ ] Performance benchmarks and optimization
-- [ ] Comprehensive documentation and tutorials
+- [ ] Python SDK
 - [ ] Security audit
 
 > 📋 See [ROADMAP.md](./ROADMAP.md) for the full breakdown with milestones and RFCs.
@@ -268,12 +263,21 @@ We're building in public. Here's where we're headed:
 agentvm/
 ├── src/
 │   ├── core/              # Kernel, Agent, Process primitives
-│   │   ├── kernel.ts      # Main kernel runtime
+│   │   ├── kernel.ts      # Main kernel runtime + Kernel.stats()
 │   │   ├── agent.ts       # Agent definition
 │   │   ├── process.ts     # Process state machine
+│   │   ├── contracts.ts   # Runtime input/output validation
 │   │   └── types.ts       # Shared type definitions
-│   ├── memory/            # Memory bus
-│   │   └── bus.ts         # Namespaced memory with TTL
+│   ├── memory/            # Pluggable memory system
+│   │   ├── backend.ts     # MemoryBackend interface
+│   │   ├── bus.ts         # MemoryBus (accepts any backend)
+│   │   └── backends/
+│   │       ├── memory.ts  # InMemoryBackend (default)
+│   │       └── sqlite.ts  # SqliteBackend (file persistence)
+│   ├── config/            # YAML config system
+│   │   └── loader.ts      # Parser, validator, env overrides
+│   ├── checkpoint/        # Process checkpointing
+│   │   └── checkpoint.ts  # Save/restore process state
 │   ├── tools/             # Tool router
 │   │   └── router.ts      # Registration, rate limiting, invocation
 │   ├── broker/            # Message broker
@@ -290,14 +294,8 @@ agentvm/
 │   │   ├── index.ts       # CLI entry point
 │   │   └── commands/      # init, start, ps, kill, logs
 │   └── index.ts           # Public API exports
-├── tests/unit/            # 163 unit tests
+├── tests/unit/            # 299 unit tests
 ├── examples/              # Working examples
-│   ├── hello-world.ts     # Basic agent with tools and memory
-│   ├── memory-demo.ts     # Memory isolation and persistence
-│   ├── multi-agent.ts     # Multi-agent coordination
-│   ├── llm-research-agent.ts  # Real LLM agent with Claude
-│   ├── llm-pipeline.ts    # Researcher → Writer → Editor pipeline
-│   └── mcp-agent.ts       # MCP server integration
 ├── docs/                  # Architecture docs, guides, RFCs
 └── package.json
 ```
